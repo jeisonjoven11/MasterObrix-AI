@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 
 const emptyItem = { description: '', category: 'Materiales', quantity: '', unit: 'unidad', unitPrice: '' };
 
-export default function BudgetEditor({ projects, onSave, onClose }) {
+export default function BudgetEditor({ projects, initialItem, onSave, onClose }) {
   const [projectId, setProjectId] = useState(projects[0]?.id || '');
-  const [items, setItems] = useState([{ ...emptyItem }]);
+  const [items, setItems] = useState(() => initialItem ? [{ ...emptyItem, ...initialItem }] : [{ ...emptyItem }]);
   const [margin, setMargin] = useState('10');
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0), [items]);
   const profit = subtotal * ((Number(margin) || 0) / 100);
