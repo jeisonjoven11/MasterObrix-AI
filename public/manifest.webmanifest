@@ -1,0 +1,11 @@
+{
+  "name": "MasterObrix AI",
+  "short_name": "MasterObrix",
+  "description": "Gestión de proyectos, presupuestos, gastos y rentabilidad para construcción.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#111827",
+  "lang": "es",
+  "icons": []
+}
