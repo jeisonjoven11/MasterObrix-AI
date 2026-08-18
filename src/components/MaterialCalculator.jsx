@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 
 const MATERIALS = {
-  concrete: { label: 'Concreto', unit: 'm³', factor: 1 },
-  floor: { label: 'Piso', unit: 'm²', factor: 1 },
-  wall: { label: 'Muro', unit: 'm²', factor: 1 },
-  paint: { label: 'Pintura', unit: 'm²', factor: 1 },
+  concrete: { label: 'Concreto', unit: 'm³' },
+  floor: { label: 'Piso', unit: 'm²' },
+  wall: { label: 'Muro', unit: 'm²' },
+  paint: { label: 'Pintura', unit: 'm²' },
 };
 
 export default function MaterialCalculator({ onClose }) {
@@ -12,8 +12,9 @@ export default function MaterialCalculator({ onClose }) {
   const [length, setLength] = useState('');
   const [width, setWidth] = useState('');
   const [height, setHeight] = useState('');
+  const [waste, setWaste] = useState('10');
 
-  const result = useMemo(() => {
+  const baseResult = useMemo(() => {
     const l = Number(length) || 0;
     const w = Number(width) || 0;
     const h = Number(height) || 0;
@@ -23,6 +24,7 @@ export default function MaterialCalculator({ onClose }) {
     return l * w;
   }, [material, length, width, height]);
 
+  const finalResult = baseResult * (1 + Math.max(0, Number(waste) || 0) / 100);
   const item = MATERIALS[material];
 
   return (
@@ -43,10 +45,13 @@ export default function MaterialCalculator({ onClose }) {
           <label>Ancho (m)<input type="number" min="0" step="0.01" value={width} onChange={e => setWidth(e.target.value)} placeholder="0" /></label>
         </div>
         {(material === 'wall' || material === 'concrete') && <label>Alto / espesor (m)<input type="number" min="0" step="0.01" value={height} onChange={e => setHeight(e.target.value)} placeholder={material === 'wall' ? '2.5' : '0.1'} /></label>}
+        <label>Desperdicio / reserva (%)
+          <input type="number" min="0" max="100" step="0.5" value={waste} onChange={e => setWaste(e.target.value)} />
+        </label>
         <div className="budget-summary">
-          <span>Resultado estimado</span>
-          <strong style={{display:'block',fontSize:28,marginTop:6}}>{result.toLocaleString(undefined,{maximumFractionDigits:2})} {item.unit}</strong>
-          <small>⚠️ Es una estimación geométrica. No sustituye especificaciones técnicas ni desperdicio, espesores o dosificaciones definidos por un profesional.</small>
+          <div><span>Cantidad base</span><strong>{baseResult.toLocaleString(undefined,{maximumFractionDigits:2})} {item.unit}</strong></div>
+          <div><span>Con {Number(waste) || 0}% de reserva</span><strong>{finalResult.toLocaleString(undefined,{maximumFractionDigits:2})} {item.unit}</strong></div>
+          <small>⚠️ Es una estimación geométrica. La reserva no sustituye especificaciones técnicas, desperdicios reales, espesores o dosificaciones definidos por un profesional.</small>
         </div>
         <button className="primary form-submit" type="button" onClick={onClose}>Listo</button>
       </section>
