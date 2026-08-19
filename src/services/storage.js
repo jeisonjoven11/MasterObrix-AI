@@ -2,6 +2,7 @@ const PROJECTS_KEY = 'masterobrix-projects';
 const CLIENTS_KEY = 'masterobrix-clients';
 const BUDGETS_KEY = 'masterobrix-budgets';
 const EXPENSES_KEY = 'masterobrix-expenses';
+const MATERIALS_KEY = 'masterobrix-materials';
 
 function read(key) {
   try { return JSON.parse(localStorage.getItem(key) || '[]'); }
@@ -21,4 +22,6 @@ export const storage = {
   saveBudgets: (value) => write(BUDGETS_KEY, value),
   getExpenses: () => read(EXPENSES_KEY),
   saveExpenses: (value) => write(EXPENSES_KEY, value),
+  getMaterials: () => read(MATERIALS_KEY),
+  saveMaterials: (value) => write(MATERIALS_KEY, value),
 };
