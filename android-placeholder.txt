@@ -1,0 +1,1 @@
+Android build is generated in CI with Capacitor.
