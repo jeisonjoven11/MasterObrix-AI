@@ -13,6 +13,13 @@ const MIXES = {
   lean: { label: 'Concreto pobre (referencial)', bags: 6, sand: 0.60, gravel: 0.90, water: 170 },
 };
 
+const DEFAULT_PRICES = { cement: 0, sand: 0, gravel: 0, water: 0 };
+
+function loadPrices() {
+  try { return { ...DEFAULT_PRICES, ...JSON.parse(localStorage.getItem('masterobrix-material-prices') || '{}') }; }
+  catch { return DEFAULT_PRICES; }
+}
+
 export default function MaterialCalculator({ onClose, onAddToBudget }) {
   const [type, setType] = useState('floor');
   const [length, setLength] = useState('');
@@ -21,6 +28,8 @@ export default function MaterialCalculator({ onClose, onAddToBudget }) {
   const [height, setHeight] = useState('2.50');
   const [waste, setWaste] = useState('5');
   const [mix, setMix] = useState('standard');
+  const [prices, setPrices] = useState(loadPrices);
+  const [pricesSaved, setPricesSaved] = useState(false);
 
   const result = useMemo(() => {
     const l = Number(length) || 0;
@@ -45,16 +54,36 @@ export default function MaterialCalculator({ onClose, onAddToBudget }) {
     };
   }, [result.volume, type, mix]);
 
+  const estimatedCost = useMemo(() => {
+    if (!concrete) return 0;
+    return (concrete.bags * Number(prices.cement || 0)) +
+      (concrete.sand * Number(prices.sand || 0)) +
+      (concrete.gravel * Number(prices.gravel || 0)) +
+      (concrete.water * Number(prices.water || 0));
+  }, [concrete, prices]);
+
   const item = TYPES[type];
+
+  function updatePrice(key, value) {
+    setPricesSaved(false);
+    setPrices((current) => ({ ...current, [key]: value }));
+  }
+
+  function savePrices() {
+    localStorage.setItem('masterobrix-material-prices', JSON.stringify(prices));
+    setPricesSaved(true);
+  }
 
   function add() {
     if (!result.volume && !result.area) return;
     const quantity = type === 'paint' || type === 'wall' ? result.area : result.volume;
+    const unitPrice = concrete && result.volume ? estimatedCost / result.volume : 0;
     onAddToBudget?.({
-      description: `${item.label} (${type === 'floor' ? 'concreto' : 'estimado'})`,
+      description: concrete ? `${item.label} + materiales estimados` : `${item.label} (${type === 'floor' ? 'concreto' : 'estimado'})`,
       category: 'Materiales',
       quantity: Number(quantity.toFixed(2)),
       unit: item.unit,
+      unitPrice: Number(unitPrice.toFixed(2)),
     });
   }
 
@@ -85,6 +114,13 @@ export default function MaterialCalculator({ onClose, onAddToBudget }) {
       </>}
       <small>⚠️ Estimación referencial. Las cantidades reales dependen de la resistencia especificada, dosificación aprobada, materiales disponibles, humedad, compactación y condiciones de la obra. Verifica con el responsable técnico antes de comprar o ejecutar.</small>
     </div>
+
+    {concrete && <div className="budget-summary material-prices"><div className="form-heading"><div><span className="eyebrow">COSTOS</span><h3>💰 Mis precios de materiales</h3></div></div>
+      <div className="form-row"><label>Cemento / bulto<input type="number" min="0" step="100" value={prices.cement} onChange={e => updatePrice('cement', e.target.value)} placeholder="$" /></label><label>Arena / m³<input type="number" min="0" step="1000" value={prices.sand} onChange={e => updatePrice('sand', e.target.value)} placeholder="$" /></label></div>
+      <div className="form-row"><label>Grava / m³<input type="number" min="0" step="1000" value={prices.gravel} onChange={e => updatePrice('gravel', e.target.value)} placeholder="$" /></label><label>Agua / L<input type="number" min="0" step="10" value={prices.water} onChange={e => updatePrice('water', e.target.value)} placeholder="$" /></label></div>
+      <div><span>Costo estimado de materiales</span><strong>${estimatedCost.toLocaleString()}</strong></div>
+      <button type="button" className="form-submit" onClick={savePrices}>💾 Guardar mis precios</button>{pricesSaved && <small>✅ Precios guardados en este dispositivo.</small>}
+    </div>}
 
     <div className="form-row"><button className="primary form-submit" type="button" disabled={!quantity} onClick={add}>➕ Añadir al presupuesto</button><button className="form-submit" type="button" onClick={onClose}>Listo</button></div>
   </section></div>;
