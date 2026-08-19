@@ -13,8 +13,8 @@ const CATALOG = [
   ['Tubo PVC 1/2"','metros','Plomería',6500],
 ];
 
-export default function ProjectMaterials({ projects, materials, onSave, onAddExpense, onClose }) {
-  const [projectId,setProjectId]=useState(projects[0]?.id||'');
+export default function ProjectMaterials({ projects, materials, initialProjectId='', onSave, onAddExpense, onClose }) {
+  const [projectId,setProjectId]=useState(initialProjectId || projects[0]?.id||'');
   const [name,setName]=useState(''); const [unit,setUnit]=useState('sacos');
   const [needed,setNeeded]=useState(''); const [purchased,setPurchased]=useState(''); const [price,setPrice]=useState(''); const [search,setSearch]=useState(''); const [category,setCategory]=useState('Todas');
   const rows=materials.filter(m=>m.projectId===projectId);
