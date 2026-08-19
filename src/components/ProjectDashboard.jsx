@@ -10,17 +10,22 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
   const planned = Number(project.budget || 0);
   const remaining = Math.max(0, planned - spent);
   const materialMissing = projectMaterials.reduce((s,m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)), 0);
+  const materialSpent = projectMaterials.reduce((s,m) => s + Number(m.spent || 0), 0);
   const progress = planned > 0 ? Math.min(100, Math.round((spent / planned) * 100)) : 0;
+  const projectedCost = spent + projectMaterials.reduce((s,m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)) * Number(m.unitPrice || 0), 0);
+  const projectedBalance = planned - projectedCost;
   const alerts = useMemo(() => [
     ...(planned > 0 && spent > planned ? ['🔴 Los gastos superan el presupuesto de la obra'] : []),
     ...(planned > 0 && spent / planned >= 0.8 && spent <= planned ? ['🟠 Ya consumiste más del 80% del presupuesto'] : []),
     ...(materialMissing > 0 ? [`🧱 Tienes ${materialMissing} unidades de materiales pendientes`] : []),
-  ], [planned, spent, materialMissing]);
+    ...(planned > 0 && projectedCost > planned ? ['⚠️ Con los materiales pendientes, el costo proyectado supera el presupuesto'] : []),
+  ], [planned, spent, materialMissing, projectedCost]);
 
   return <div className="modal-backdrop"><section className="project-form project-dashboard" aria-label="Centro de control de obra">
     <div className="form-heading"><div><span className="eyebrow">CENTRO DE CONTROL</span><h2>🏗️ {project.name}</h2><p>{project.client || 'Sin cliente'} · {project.address || 'Sin dirección'}</p></div><button type="button" onClick={onClose}>✕</button></div>
     <div className="stats-grid"><div className="stat-card"><span>Presupuesto</span><strong>${planned.toLocaleString()}</strong></div><div className="stat-card"><span>Gastado</span><strong>${spent.toLocaleString()}</strong></div><div className="stat-card"><span>Disponible</span><strong>${remaining.toLocaleString()}</strong></div><div className="stat-card"><span>Consumido</span><strong>{progress}%</strong></div></div>
     <div className="budget-summary"><div><span>Control financiero</span><strong>{progress}%</strong></div><div style={{height:10,background:'var(--surface-2)',borderRadius:99,overflow:'hidden'}}><div style={{height:'100%',width:`${progress}%`,background:'var(--accent)',borderRadius:99}} /></div><small>{budgeted > 0 ? `$${budgeted.toLocaleString()} presupuestados en cotizaciones` : 'Todavía no hay presupuestos vinculados a esta obra.'}</small></div>
+    <div className="stats-grid"><div className="stat-card"><span>Materiales comprados</span><strong>${materialSpent.toLocaleString()}</strong></div><div className="stat-card"><span>Costo proyectado</span><strong>${projectedCost.toLocaleString()}</strong></div><div className="stat-card"><span>Saldo proyectado</span><strong>${projectedBalance.toLocaleString()}</strong></div></div>
     {alerts.length > 0 && <div className="empty-state"><strong>⚠️ Atención</strong>{alerts.map(a => <p key={a}>{a}</p>)}</div>}
     {alerts.length === 0 && <div className="empty-state"><strong>✅ Obra bajo control</strong><p>No hay alertas financieras o de materiales en este momento.</p></div>}
     <div className="section-heading"><h3>Acciones de la obra</h3><span>{projectMaterials.length} materiales</span></div>
