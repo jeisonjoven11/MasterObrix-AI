@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 
 const UNITS = ['sacos', 'm³', 'unidades', 'litros', 'kg', 'metros'];
 
-export default function ProjectMaterials({ projects, materials, onSave, onClose }) {
+export default function ProjectMaterials({ projects, materials, onSave, onAddExpense, onClose }) {
   const [projectId, setProjectId] = useState(projects[0]?.id || '');
   const [name, setName] = useState('');
   const [unit, setUnit] = useState('sacos');
@@ -16,12 +16,29 @@ export default function ProjectMaterials({ projects, materials, onSave, onClose 
   function addMaterial(e) {
     e.preventDefault();
     if (!projectId || !name.trim() || Number(needed) <= 0) return;
-    onSave({ id: crypto.randomUUID(), projectId, name: name.trim(), unit, needed: Number(needed), purchased: Number(purchased) || 0, price: Number(price) || 0 });
+    onSave({ id: crypto.randomUUID(), projectId, name: name.trim(), unit, needed: Number(needed), purchased: Number(purchased) || 0, recordedPurchased: 0, price: Number(price) || 0 });
     setName(''); setNeeded(''); setPurchased(''); setPrice('');
   }
 
   function updatePurchased(material, value) {
     onSave({ ...material, purchased: Math.max(0, Number(value) || 0), replaceId: material.id });
+  }
+
+  function registerPurchase(material) {
+    const purchasedNow = Number(material.purchased) || 0;
+    const alreadyRecorded = Number(material.recordedPurchased) || 0;
+    const delta = Math.max(0, purchasedNow - alreadyRecorded);
+    if (!delta || Number(material.price) <= 0) return;
+    onAddExpense?.({
+      id: crypto.randomUUID(),
+      projectId: material.projectId,
+      description: `Compra de ${material.name}`,
+      category: 'Materiales',
+      amount: Number((delta * Number(material.price)).toFixed(2)),
+      date: new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
+    });
+    onSave({ ...material, recordedPurchased: purchasedNow, replaceId: material.id });
   }
 
   return <div className="modal-backdrop"><section className="project-form material-tracker" aria-label="Materiales de la obra">
@@ -35,9 +52,9 @@ export default function ProjectMaterials({ projects, materials, onSave, onClose 
       <button className="primary form-submit" type="submit">➕ Agregar material</button>
     </form>
 
-    {rows.length === 0 ? <div className="empty-state"><span>📦</span><strong>Aún no tienes materiales registrados</strong><p>Agrega lo que necesitas o trae materiales desde la calculadora.</p></div> : <div className="material-list">{rows.map(m => { const missing = Math.max(0, Number(m.needed) - Number(m.purchased)); return <article className="material-row" key={m.id}><div><strong>{m.name}</strong><small>{m.purchased} / {m.needed} {m.unit}</small></div><div><label>Comprado<input aria-label={`Comprado ${m.name}`} type="number" min="0" step="0.01" value={m.purchased} onChange={e => updatePurchased(m, e.target.value)} /></label><strong className={missing ? 'material-missing' : 'material-ok'}>{missing ? `Faltan ${missing} ${m.unit}` : '✓ Completo'}</strong></div></article>; })}</div>}
+    {rows.length === 0 ? <div className="empty-state"><span>📦</span><strong>Aún no tienes materiales registrados</strong><p>Agrega lo que necesitas o trae materiales desde la calculadora.</p></div> : <div className="material-list">{rows.map(m => { const missing = Math.max(0, Number(m.needed) - Number(m.purchased)); const pendingPurchase = Math.max(0, Number(m.purchased) - Number(m.recordedPurchased || 0)); return <article className="material-row" key={m.id}><div><strong>{m.name}</strong><small>{m.purchased} / {m.needed} {m.unit}</small></div><div><label>Comprado<input aria-label={`Comprado ${m.name}`} type="number" min="0" step="0.01" value={m.purchased} onChange={e => updatePurchased(m, e.target.value)} /></label><strong className={missing ? 'material-missing' : 'material-ok'}>{missing ? `Faltan ${missing} ${m.unit}` : '✓ Completo'}</strong>{pendingPurchase > 0 && Number(m.price) > 0 && <button className="form-submit" type="button" onClick={() => registerPurchase(m)}>💸 Registrar compra ${ (pendingPurchase * Number(m.price)).toLocaleString() }</button>}</div></article>; })}</div>}
 
-    <div className="budget-summary"><div><span>💸 Compra registrada</span><strong>${totalSpent.toLocaleString()}</strong></div><small>Registra cantidades compradas para saber rápidamente qué falta en la obra.</small></div>
+    <div className="budget-summary"><div><span>💸 Compras contabilizadas</span><strong>${totalSpent.toLocaleString()}</strong></div><small>Registra una compra para enviarla también a los gastos reales de la obra. Si cambias la cantidad comprada, solo se contabiliza la diferencia pendiente.</small></div>
     <button className="form-submit" type="button" onClick={onClose}>Listo</button>
   </section></div>;
 }
