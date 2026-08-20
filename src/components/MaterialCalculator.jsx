@@ -20,6 +20,8 @@ export default function MaterialCalculator({ onClose, onAddToBudget }) {
   const [height, setHeight] = useState('');
   const [waste, setWaste] = useState('10');
   const [mix, setMix] = useState('general');
+  const [unitPrice, setUnitPrice] = useState('');
+  const [priceMode, setPriceMode] = useState('unit');
   const baseResult = useMemo(() => {
     const l = Number(length) || 0, w = Number(width) || 0, h = Number(height) || 0;
     if (!l || !w) return 0;
@@ -40,6 +42,11 @@ export default function MaterialCalculator({ onClose, onAddToBudget }) {
       water: finalResult * mixData.water,
     };
   }, [material, finalResult, mixData]);
+  const estimatedTotal = useMemo(() => {
+    const price = Number(unitPrice) || 0;
+    if (!price || !finalResult) return 0;
+    return priceMode === 'total' ? price : finalResult * price;
+  }, [unitPrice, finalResult, priceMode]);
   function add() {
     if (!finalResult) return;
     onAddToBudget?.({
@@ -47,12 +54,14 @@ export default function MaterialCalculator({ onClose, onAddToBudget }) {
       category: 'Materiales',
       quantity: Number(finalResult.toFixed(2)),
       unit: item.unit,
+      unitPrice: priceMode === 'unit' ? Number(unitPrice) || 0 : 0,
+      total: Number(estimatedTotal.toFixed(2)),
       calculation: concreteBreakdown ? { mix: mixData.label, ...concreteBreakdown } : null,
     });
   }
   return <div className="modal-backdrop"><section className="project-form" aria-label="Calculadora de materiales">
     <div className="form-heading"><div><span className="eyebrow">HERRAMIENTA</span><h2>🧮 Calcular materiales</h2></div><button type="button" onClick={onClose} aria-label="Cerrar">✕</button></div>
-    <p style={{ marginBottom: 18 }}>Calcula cantidades estimadas y llévalas directamente a tu presupuesto.</p>
+    <p style={{ marginBottom: 18 }}>Calcula cantidades, estima el costo y llévalo directamente al presupuesto.</p>
     <label>Material<select value={material} onChange={e => setMaterial(e.target.value)}>{Object.entries(MATERIALS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select></label>
     <div className="form-row"><label>Largo (m)<input type="number" min="0" step="0.01" value={length} onChange={e => setLength(e.target.value)} placeholder="0" /></label><label>Ancho (m)<input type="number" min="0" step="0.01" value={width} onChange={e => setWidth(e.target.value)} placeholder="0" /></label></div>
     {(material === 'wall' || material === 'concrete') && <label>{material === 'wall' ? 'Alto (m)' : 'Espesor (m)'}<input type="number" min="0" step="0.01" value={height} onChange={e => setHeight(e.target.value)} placeholder={material === 'wall' ? '2.5' : '0.10'} /></label>}
@@ -60,6 +69,7 @@ export default function MaterialCalculator({ onClose, onAddToBudget }) {
     <label>Desperdicio / reserva (%)<input type="number" min="0" max="100" step="0.5" value={waste} onChange={e => setWaste(e.target.value)} /></label>
     <div className="budget-summary"><div><span>Cantidad base</span><strong>{baseResult.toLocaleString(undefined,{maximumFractionDigits:2})} {item.unit}</strong></div><div><span>Con {Number(waste) || 0}% de reserva</span><strong>{finalResult.toLocaleString(undefined,{maximumFractionDigits:2})} {item.unit}</strong></div></div>
     {concreteBreakdown && <div className="budget-summary"><strong>🧱 Materiales estimados</strong><div><span>🪨 Cemento</span><strong>{concreteBreakdown.cement} sacos aprox. de 50 kg</strong></div><div><span>🏖️ Arena</span><strong>{concreteBreakdown.sand.toFixed(2)} m³</strong></div><div><span>🪨 Grava</span><strong>{concreteBreakdown.gravel.toFixed(2)} m³</strong></div><div><span>💧 Agua</span><strong>{Math.round(concreteBreakdown.water)} litros</strong></div><small>⚠️ Dosificación de referencia. La resistencia, granulometría, humedad, tipo de cemento y diseño de mezcla deben verificarse según las especificaciones del proyecto y por el profesional responsable.</small></div>}
+    <div className="budget-summary"><strong>💰 Estimar costo</strong><label>Precio<select value={priceMode} onChange={e => setPriceMode(e.target.value)}><option value="unit">Por {item.unit}</option><option value="total">Costo total</option></select><input type="number" min="0" step="1" value={unitPrice} onChange={e => setUnitPrice(e.target.value)} placeholder="Ej. 45000" /></label>{estimatedTotal > 0 && <div><span>Costo estimado</span><strong>${estimatedTotal.toLocaleString('es-CO')}</strong></div>}<small>El precio es editable y sirve como estimación; luego podremos reemplazarlo por precios de proveedores.</small></div>
     <div className="budget-summary"><small>⚠️ Las cantidades son estimaciones de referencia y no sustituyen planos, memorias de cálculo, especificaciones técnicas ni la verificación del profesional responsable.</small></div>
     <div className="form-row"><button className="primary form-submit" type="button" disabled={!finalResult} onClick={add}>Añadir al presupuesto</button><button className="form-submit" type="button" onClick={onClose}>Listo</button></div>
   </section></div>;
