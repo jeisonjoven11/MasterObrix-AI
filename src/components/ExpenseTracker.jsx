@@ -2,9 +2,8 @@ import { useMemo, useState } from 'react';
 
 const emptyExpense = { description: '', category: 'Materiales', amount: '', date: '' };
 
-export default function ExpenseTracker({ projects, expenses, onSave, onDelete, onClose }) {
-  const [projectId, setProjectId] = useState(projects[0]?.id || '');
-  const [form, setForm] = useState(emptyExpense);
+export default function ExpenseTracker({ projects, expenses, initialProjectId = '', onSave, onDelete, onClose }) {
+  const [projectId, setProjectId] = useState(initialProjectId || projects[0]?.id || '');
   const projectExpenses = useMemo(() => expenses.filter((expense) => expense.projectId === projectId), [expenses, projectId]);
   const total = projectExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
 
@@ -14,6 +13,8 @@ export default function ExpenseTracker({ projects, expenses, onSave, onDelete, o
     onSave({ ...form, id: crypto.randomUUID(), projectId, amount: Number(form.amount), createdAt: new Date().toISOString() });
     setForm(emptyExpense);
   }
+
+  const [form, setForm] = useState(emptyExpense);
 
   return <div className="modal-backdrop"><div className="budget-form">
     <div className="form-heading"><div><span className="eyebrow">CONTROL DE GASTOS</span><h2>Gastos reales</h2></div><button type="button" onClick={onClose}>✕</button></div>
