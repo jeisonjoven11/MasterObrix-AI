@@ -47,7 +47,7 @@ function answerFor(question, context) {
   const q = question.toLowerCase();
   if (q.includes('cómo va') || q.includes('estado') || q.includes('resumen')) {
     if (!context) return { text: 'Para analizar una obra necesito que abras un proyecto. Después podré usar sus materiales, gastos y presupuesto como contexto.' };
-    return { text: `🏗️ ${context.name}\n\n${context.summary}\n\n🤖 Recomendación: ${context.nextAction}`, actions: ['🧱 Revisar materiales', '💸 Revisar gastos', '💰 Revisar presupuesto'] };
+    return { text: `🏗️ ${context.name}\n\n${context.summary}\n\n📐 Perfil técnico\n${context.technical}\n\n🤖 Recomendación: ${context.nextAction}`, actions: ['🧱 Revisar materiales', '💸 Revisar gastos', '💰 Revisar presupuesto'] };
   }
   if (q.includes('falta') && q.includes('material')) {
     if (!context) return { text: 'Abre una obra para que pueda revisar los materiales registrados y calcular lo pendiente.' };
@@ -78,9 +78,20 @@ function buildContext(project, budgets, expenses, materials) {
   const projectedBalance = planned - projected;
   const status = planned <= 0 ? '⚪ Falta definir presupuesto' : projected > planned ? '🔴 Riesgo de sobrecosto' : consumed >= 80 ? '🟠 Vigilar costos' : '🟢 Bajo control';
   const nextAction = planned <= 0 ? 'Define el presupuesto para activar el control financiero.' : projected > planned ? 'Revisa materiales pendientes y gastos antes de nuevas compras.' : pendingUnits > 0 ? `Revisa las ${money(pendingUnits)} unidades de materiales pendientes.` : 'Continúa registrando compras y gastos para mantener el diagnóstico actualizado.';
+  const technical = [
+    project.projectType && `Tipo: ${project.projectType}`,
+    project.area !== '' && `Área: ${money(project.area)} m²`,
+    project.floors && `Pisos: ${project.floors}`,
+    project.bedrooms !== '' && `Habitaciones: ${project.bedrooms}`,
+    project.bathrooms !== '' && `Baños: ${project.bathrooms}`,
+    project.blockType && `Bloque/mampostería: ${project.blockType}`,
+    project.wallHeight && `Altura de muro: ${project.wallHeight} m`,
+    `Avance físico: ${Math.min(100, Math.max(0, Number(project.progress || 0)))}%`
+  ].filter(Boolean).join('\n');
   return {
     name: project.name,
     summary: `Estado: ${status}\nPresupuesto: ${money(planned)}\nGastado: ${money(spent)} (${consumed}%)\nCosto proyectado: ${money(projected)}\nSaldo proyectado: ${money(projectedBalance)}`,
+    technical,
     materialSummary: `🧱 Materiales registrados: ${projectMaterials.length}\nUnidades pendientes: ${money(pendingUnits)}\nCosto pendiente estimado: ${money(pendingCost)}\n\nEstos datos provienen de los registros actuales de la obra. Verifica cantidades antes de comprar.`,
     financialSummary: `💰 Presupuesto: ${money(planned)}\n💸 Gastado: ${money(spent)}\n📈 Costo proyectado: ${money(projected)}\n📊 Saldo proyectado: ${money(projectedBalance)}\n\nEstado: ${status}`,
     nextAction,
@@ -91,7 +102,7 @@ function buildContext(project, budgets, expenses, materials) {
 export default function AssistantPanel({ onClose, project, budgets = [], expenses = [], materials = [] }) {
   const context = useMemo(() => buildContext(project, budgets, expenses, materials), [project, budgets, expenses, materials]);
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState(() => context ? [{ role: 'assistant', text: `🏗️ Estoy revisando **${context.name}**.\n\n${context.summary}\n\nPuedes preguntarme por materiales, gastos, presupuesto o riesgos.` }] : []);
+  const [messages, setMessages] = useState(() => context ? [{ role: 'assistant', text: `🏗️ Estoy revisando **${context.name}**.\n\n${context.summary}\n\n📐 ${context.technical.replace(/\n/g, ' · ')}\n\nPuedes preguntarme por materiales, gastos, presupuesto o riesgos.` }] : []);
 
   function ask(text = question) {
     const clean = text.trim();
@@ -108,7 +119,7 @@ export default function AssistantPanel({ onClose, project, budgets = [], expense
   return <div className="modal-backdrop"><section className="assistant-panel">
     <div className="form-heading"><div><span className="eyebrow">MASTEROBRIX AI</span><h2>Asistente de construcción</h2><p>{context ? `Analizando: ${context.name}` : 'Calcula, orienta y te propone el siguiente paso.'}</p></div><button type="button" onClick={onClose}>✕</button></div>
     <div className="assistant-disclaimer">🧠 Modo actual: asistente local. No hay un modelo externo conectado todavía. Cuando conectemos el servicio seguro de IA, podrá razonar sobre este mismo contexto de obra. Verifica cantidades, precios y normativa con el profesional responsable.</div>
-    {context && <div className="assistant-context"><strong>📌 Contexto de obra</strong><span>{context.summary.split('\n').slice(0, 3).join(' · ')}</span></div>}
+    {context && <div className="assistant-context"><strong>📌 Contexto de obra</strong><span>{context.name} · {context.technical.replace(/\n/g, ' · ')}</span></div>}
     <div className="assistant-suggestions">{suggestions.map((item) => <button type="button" key={item} onClick={() => ask(item)}>{item}</button>)}</div>
     <div className="assistant-messages">{messages.length === 0 ? <div className="assistant-empty">🏗️<strong>¿En qué obra estás trabajando?</strong><span>Puedo ayudarte a calcular materiales, revisar presupuestos y controlar gastos.</span></div> : messages.map((message, index) => <div key={`${message.role}-${index}`}><div className={`assistant-message ${message.role}`} style={{ whiteSpace: 'pre-line' }}>{message.text}</div>{message.role === 'assistant' && message.actions?.length > 0 && <div className="assistant-suggestions">{message.actions.map((item) => <button type="button" key={item} onClick={() => action(item)}>{item}</button>)}</div>}</div>)}</div>
     <form className="assistant-input" onSubmit={(e) => { e.preventDefault(); ask(); }}><input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ej: ¿Cómo va mi obra?"/><button className="primary" type="submit">Preguntar</button></form>
