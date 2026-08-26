@@ -18,7 +18,8 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
   const projectedCost = spent + pendingMaterialCost;
   const projectedBalance = planned - projectedCost;
   const consumed = planned > 0 ? (spent / planned) * 100 : 0;
-  const progress = Math.min(100, Math.max(0, Math.round(consumed)));
+  const physicalProgress = Math.min(100, Math.max(0, Number(project.progress || 0)));
+  const progress = physicalProgress > 0 ? Math.round(physicalProgress) : Math.min(100, Math.max(0, Math.round(consumed)));
   const status = planned <= 0 ? '⚪ Falta presupuesto' : projectedCost > planned ? '🔴 Riesgo de sobrecosto' : consumed >= 80 ? '🟠 Vigilar costos' : '🟢 Bajo control';
 
   const alerts = useMemo(() => [
@@ -40,13 +41,23 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
 
   const health = planned <= 0 ? 0 : Math.max(0, Math.min(100, Math.round((projectedBalance / planned) * 100)));
   const healthLabel = planned <= 0 ? 'Sin datos' : health >= 20 ? 'Margen saludable' : health >= 0 ? 'Margen ajustado' : 'Déficit proyectado';
+  const technical = [
+    ['Tipo', project.projectType || '—'],
+    ['Área', project.area ? `${number(project.area)} m²` : '—'],
+    ['Pisos', project.floors ? number(project.floors) : '—'],
+    ['Habitaciones', project.bedrooms !== '' && project.bedrooms != null ? number(project.bedrooms) : '—'],
+    ['Baños', project.bathrooms !== '' && project.bathrooms != null ? number(project.bathrooms) : '—'],
+    ['Bloque', project.blockType || '—'],
+    ['Altura de muro', project.wallHeight ? `${project.wallHeight} m` : '—'],
+  ];
 
   return <div className="modal-backdrop"><section className="project-form project-dashboard" aria-label="Centro de control de obra">
     <div className="form-heading"><div><span className="eyebrow">CENTRO DE CONTROL</span><h2>🏗️ {project.name}</h2><p>{project.client || 'Sin cliente'} · {project.address || 'Sin dirección'}</p></div><button type="button" onClick={onClose} aria-label="Cerrar">✕</button></div>
+    <div className="project-profile"><div className="technical-heading"><span>📐 PERFIL TÉCNICO DE LA OBRA</span><small>Contexto disponible para MasterObrix AI</small></div><div className="profile-grid">{technical.map(([label,value])=><div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div><div className="physical-progress"><div><span>Avance físico</span><strong>{progress}%</strong></div><div className="health-bar"><i style={{width:`${progress}%`}} /></div><small>{physicalProgress > 0 ? 'Avance registrado manualmente.' : 'Sin avance físico registrado; se muestra una referencia basada en consumo de presupuesto.'}</small></div></div>
     <div className="stats-grid">
-      <div className="stat-card"><span>Presupuesto</span><strong>{money(planned)}</strong></div><div className="stat-card"><span>Gastado</span><strong>{money(spent)}</strong></div><div className="stat-card"><span>Disponible</span><strong className={remaining < 0 ? 'negative' : ''}>{money(remaining)}</strong></div><div className="stat-card"><span>Consumido</span><strong>{progress}%</strong></div>
+      <div className="stat-card"><span>Presupuesto</span><strong>{money(planned)}</strong></div><div className="stat-card"><span>Gastado</span><strong>{money(spent)}</strong></div><div className="stat-card"><span>Disponible</span><strong className={remaining < 0 ? 'negative' : ''}>{money(remaining)}</strong></div><div className="stat-card"><span>Consumido</span><strong>{Math.round(consumed)}%</strong></div>
     </div>
-    <div className="budget-summary"><div><span>Estado financiero</span><strong>{status}</strong></div><div role="progressbar" aria-label="Porcentaje de presupuesto consumido" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100" style={{height:10,background:'var(--surface-2)',borderRadius:99,overflow:'hidden'}}><div style={{height:'100%',width:`${progress}%`,background:'var(--accent)',borderRadius:99,transition:'width .25s ease'}} /></div><small>{budgeted > 0 ? `${money(budgeted)} presupuestados en cotizaciones` : 'Todavía no hay presupuestos vinculados a esta obra.'}</small></div>
+    <div className="budget-summary"><div><span>Estado financiero</span><strong>{status}</strong></div><div role="progressbar" aria-label="Porcentaje de presupuesto consumido" aria-valuenow={Math.round(consumed)} aria-valuemin="0" aria-valuemax="100" style={{height:10,background:'var(--surface-2)',borderRadius:99,overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(100,Math.max(0,consumed))}%`,background:'var(--accent)',borderRadius:99,transition:'width .25s ease'}} /></div><small>{budgeted > 0 ? `${money(budgeted)} presupuestados en cotizaciones` : 'Todavía no hay presupuestos vinculados a esta obra.'}</small></div>
     <div className="stats-grid">
       <div className="stat-card"><span>Materiales comprados</span><strong>{money(materialSpent)}</strong></div><div className="stat-card"><span>Material pendiente</span><strong>{money(pendingMaterialCost)}</strong></div><div className="stat-card"><span>Costo proyectado</span><strong>{money(projectedCost)}</strong></div><div className="stat-card"><span>Saldo proyectado</span><strong className={projectedBalance < 0 ? 'negative' : ''}>{money(projectedBalance)}</strong></div>
     </div>
