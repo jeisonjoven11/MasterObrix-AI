@@ -36,7 +36,7 @@ function floorCalculation(question) {
   const waterLiters = volume * 175;
 
   return {
-    text: `📐 Resultado estimado\n\nÁrea: ${money(area)} m²\nConcreto base: ${money(baseVolume)} m³\nCon desperdicio (${waste}%): ${money(volume)} m³\n\n🧱 Materiales de referencia\n• Cemento: ${money(cementBags)} sacos\n• Arena: ${money(sandM3)} m³\n• Grava: ${money(gravelM3)} m³\n• Agua: ${money(waterLiters)} L\n\n¿Qué quieres hacer ahora?`,
+    text: `📐 Resultado estimado\n\nÁrea: ${money(area)} m²\nConcreto base: ${money(baseVolume)} m³\nCon desperdicio (${waste}%): ${money(volume)} m³\n\n🧱 Materiales de referencia\n• Cemento: ${money(cementBags)} sacos\n• Arena: ${money(sandM3)} m³\n• Grava: ${money(gravelM3)} m³\n• Agua: ${money(waterLiters)} L\n\n⚠️ Es una estimación de referencia. La dosificación y cantidades finales deben verificarse según especificación técnica, resistencia, agregados y normativa aplicable.\n\n¿Qué quieres hacer ahora?`,
     actions: ['📋 Llevar al presupuesto', '🛒 Preparar compra', '🔄 Hacer otro cálculo']
   };
 }
@@ -71,7 +71,7 @@ export default function AssistantPanel({ onClose }) {
 
   return <div className="modal-backdrop"><section className="assistant-panel">
     <div className="form-heading"><div><span className="eyebrow">MASTEROBRIX AI</span><h2>Asistente de construcción</h2><p>Calcula, orienta y te propone el siguiente paso.</p></div><button type="button" onClick={onClose}>✕</button></div>
-    <div className="assistant-disclaimer">🧠 Primera capa de IA local: interpreta consultas comunes y cálculos de referencia sin enviar datos de tu obra a un servicio externo. Verifica cantidades, precios y normativa con el profesional responsable.</div>
+    <div className="assistant-disclaimer">🧠 Modo actual: asistente local. No hay un modelo externo conectado todavía. Esta versión interpreta consultas comunes y hace cálculos de referencia dentro de la app. Cuando conectemos el servicio seguro de IA, podrá analizar el contexto de cada obra. Verifica cantidades, precios y normativa con el profesional responsable.</div>
     <div className="assistant-suggestions">{suggestions.map((item) => <button type="button" key={item} onClick={() => ask(item)}>{item}</button>)}</div>
     <div className="assistant-messages">{messages.length === 0 ? <div className="assistant-empty">🏗️<strong>¿En qué obra estás trabajando?</strong><span>Puedo ayudarte a calcular materiales, revisar presupuestos y controlar gastos.</span></div> : messages.map((message, index) => <div key={`${message.role}-${index}`}><div className={`assistant-message ${message.role}`} style={{ whiteSpace: 'pre-line' }}>{message.text}</div>{message.role === 'assistant' && message.actions?.length > 0 && <div className="assistant-suggestions">{message.actions.map((item) => <button type="button" key={item} onClick={() => action(item)}>{item}</button>)}</div>}</div>)}</div>
     <form className="assistant-input" onSubmit={(e) => { e.preventDefault(); ask(); }}><input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ej: piso 6 x 5 m, espesor 10 cm..."/><button className="primary" type="submit">Preguntar</button></form>
