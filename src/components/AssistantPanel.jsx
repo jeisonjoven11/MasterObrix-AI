@@ -5,6 +5,7 @@ const suggestions = [
   '¿Qué materiales me faltan?',
   '¿Estoy en riesgo de sobrecosto?',
   '¿Qué debería revisar hoy en mi obra?',
+  'Haz una revisión inteligente de mi obra',
   'Calcula un piso de concreto de 6 x 5 m y 10 cm de espesor'
 ];
 
@@ -49,6 +50,10 @@ function answerFor(question, context) {
     if (!context) return { text: 'Para analizar una obra necesito que abras un proyecto. Después podré usar sus materiales, gastos y presupuesto como contexto.' };
     return { text: `🏗️ ${context.name}\n\n${context.summary}\n\n📐 Perfil técnico\n${context.technical}\n\n🤖 Recomendación: ${context.nextAction}`, actions: ['🧱 Revisar materiales', '💸 Revisar gastos', '💰 Revisar presupuesto'] };
   }
+  if (q.includes('revisión inteligente') || q.includes('revision inteligente') || q.includes('diagnóstico') || q.includes('diagnostico')) {
+    if (!context) return { text: 'Abre una obra para ejecutar la revisión inteligente con sus datos reales.' };
+    return { text: `🧠 REVISIÓN INTELIGENTE\n\n${context.diagnostic}\n\n🎯 Próximo paso recomendado\n${context.nextAction}`, actions: ['🧱 Revisar materiales', '💸 Revisar gastos', '💰 Revisar presupuesto'] };
+  }
   if (q.includes('falta') && q.includes('material')) {
     if (!context) return { text: 'Abre una obra para que pueda revisar los materiales registrados y calcular lo pendiente.' };
     return { text: context.materialSummary, actions: ['🧱 Registrar materiales', '🛒 Preparar compra'] };
@@ -57,11 +62,11 @@ function answerFor(question, context) {
     if (!context) return { text: 'Abre una obra para que pueda comparar presupuesto, gastos y costo proyectado.' };
     return { text: context.financialSummary, actions: ['💸 Registrar gasto', '💰 Revisar presupuesto'] };
   }
-  if (q.includes('hoy') || q.includes('revisar')) return { text: '🏗️ Revisión rápida de obra\n\n1. ¿Qué trabajos se ejecutaron hoy?\n2. ¿Qué materiales se consumieron?\n3. ¿Qué compras quedaron pendientes?\n4. ¿Hay algún gasto fuera del presupuesto?\n5. ¿Existe algún trabajo adicional solicitado por el cliente?\n\nSi registras esos datos, puedo ayudarte a detectar desvíos antes de que se conviertan en sobrecostos.', actions: ['🧱 Registrar materiales', '💸 Registrar gasto', '📊 Revisar presupuesto'] };
+  if (q.includes('hoy') || q.includes('revisar')) return { text: '🏗️ Revisión rápida de obra\n\n1. ¿Qué trabajos se ejecutaron hoy?\n2. ¿Qué materiales se consumieron?\n3. ¿Qué compras quedaron pendientes?\n4. ¿Hay algún gasto fuera del presupuesto?\n5. ¿Existe algún trabajo adicional solicitado por el cliente?\n\nSi registras esos datos, puedo ayudarte a detectar desvíos antes de que se conviertan en sobrecostos.', actions: ['🧠 Revisión inteligente', '🧱 Registrar materiales', '💸 Registrar gasto'] };
   if (q.includes('baño') || q.includes('remodel')) return { text: 'Para una remodelación conviene revisar demolición, retiro de residuos, instalaciones hidráulicas y eléctricas, impermeabilización, revestimientos, aparatos, mano de obra, transporte y contingencia. Convierte cada partida en un ítem del presupuesto antes de cotizar.', actions: ['💰 Crear partidas', '🧱 Calcular materiales'] };
   if (q.includes('cotización') || q.includes('cliente')) return { text: 'Antes de enviar una cotización revisa alcance, cantidades, unidades, precios, mano de obra, utilidad, vigencia, condiciones de pago y exclusiones. El cliente debe poder entender exactamente qué está comprando.', actions: ['💰 Revisar presupuesto', '📄 Preparar cotización'] };
   if (q.includes('material') || q.includes('cemento') || q.includes('arena')) return { text: 'Puedo ayudarte a preparar un cálculo de materiales. Para un piso o placa de concreto dime, por ejemplo: “piso 6 x 5 m, espesor 10 cm, desperdicio 5%”.', actions: ['🧮 Calcular materiales'] };
-  return { text: 'Puedo ayudarte con materiales, presupuestos, gastos y control de obra. Dime qué necesitas hacer y te indicaré el siguiente paso.', actions: ['🧮 Calcular materiales', '💰 Revisar presupuesto', '📊 Controlar obra'] };
+  return { text: 'Puedo ayudarte con materiales, presupuestos, gastos y control de obra. Dime qué necesitas hacer y te indicaré el siguiente paso.', actions: ['🧠 Revisión inteligente', '🧮 Calcular materiales', '💰 Revisar presupuesto'] };
 }
 
 function buildContext(project, budgets, expenses, materials) {
@@ -76,8 +81,18 @@ function buildContext(project, budgets, expenses, materials) {
   const projected = spent + pendingCost;
   const consumed = planned > 0 ? Math.round((spent / planned) * 100) : 0;
   const projectedBalance = planned - projected;
+  const progress = Math.min(100, Math.max(0, Number(project.progress || 0)));
   const status = planned <= 0 ? '⚪ Falta definir presupuesto' : projected > planned ? '🔴 Riesgo de sobrecosto' : consumed >= 80 ? '🟠 Vigilar costos' : '🟢 Bajo control';
-  const nextAction = planned <= 0 ? 'Define el presupuesto para activar el control financiero.' : projected > planned ? 'Revisa materiales pendientes y gastos antes de nuevas compras.' : pendingUnits > 0 ? `Revisa las ${money(pendingUnits)} unidades de materiales pendientes.` : 'Continúa registrando compras y gastos para mantener el diagnóstico actualizado.';
+  const warnings = [];
+  if (planned <= 0) warnings.push('⚠️ No hay presupuesto base definido.');
+  if (projectExpenses.length === 0) warnings.push('ℹ️ Aún no hay gastos registrados; el diagnóstico financiero puede estar incompleto.');
+  if (projectMaterials.length === 0) warnings.push('ℹ️ No hay materiales registrados para comparar necesidades y compras.');
+  if (pendingCost > 0) warnings.push(`🧱 Hay ${money(pendingCost)} de materiales pendientes estimados.`);
+  if (planned > 0 && projected > planned) warnings.push(`🔴 El costo proyectado supera el presupuesto en ${money(projected - planned)}.`);
+  if (planned > 0 && progress > 0 && consumed > progress + 15) warnings.push(`🟠 El gasto (${consumed}%) va bastante por delante del avance físico (${progress}%).`);
+  if (planned > 0 && progress >= 80 && consumed < 60) warnings.push('🟢 El avance físico está alto respecto al gasto registrado; conviene verificar que no falten costos por registrar.');
+  if (warnings.length === 0) warnings.push('🟢 No se detectaron alertas principales con los datos registrados.');
+  const nextAction = planned <= 0 ? 'Define el presupuesto para activar el control financiero.' : projected > planned ? 'Revisa materiales pendientes y gastos antes de nuevas compras.' : pendingUnits > 0 ? `Revisa las ${money(pendingUnits)} unidades de materiales pendientes.` : progress > consumed + 15 ? 'Verifica que los gastos y compras estén actualizados antes de asumir que el margen es real.' : 'Continúa registrando compras, gastos y avance para mantener el diagnóstico actualizado.';
   const technical = [
     project.projectType && `Tipo: ${project.projectType}`,
     project.area !== '' && `Área: ${money(project.area)} m²`,
@@ -86,7 +101,7 @@ function buildContext(project, budgets, expenses, materials) {
     project.bathrooms !== '' && `Baños: ${project.bathrooms}`,
     project.blockType && `Bloque/mampostería: ${project.blockType}`,
     project.wallHeight && `Altura de muro: ${project.wallHeight} m`,
-    `Avance físico: ${Math.min(100, Math.max(0, Number(project.progress || 0)))}%`
+    `Avance físico: ${progress}%`
   ].filter(Boolean).join('\n');
   return {
     name: project.name,
@@ -94,6 +109,7 @@ function buildContext(project, budgets, expenses, materials) {
     technical,
     materialSummary: `🧱 Materiales registrados: ${projectMaterials.length}\nUnidades pendientes: ${money(pendingUnits)}\nCosto pendiente estimado: ${money(pendingCost)}\n\nEstos datos provienen de los registros actuales de la obra. Verifica cantidades antes de comprar.`,
     financialSummary: `💰 Presupuesto: ${money(planned)}\n💸 Gastado: ${money(spent)}\n📈 Costo proyectado: ${money(projected)}\n📊 Saldo proyectado: ${money(projectedBalance)}\n\nEstado: ${status}`,
+    diagnostic: warnings.join('\n'),
     nextAction,
     budgetCount: projectBudgets.length
   };
@@ -102,7 +118,7 @@ function buildContext(project, budgets, expenses, materials) {
 export default function AssistantPanel({ onClose, project, budgets = [], expenses = [], materials = [] }) {
   const context = useMemo(() => buildContext(project, budgets, expenses, materials), [project, budgets, expenses, materials]);
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState(() => context ? [{ role: 'assistant', text: `🏗️ Estoy revisando **${context.name}**.\n\n${context.summary}\n\n📐 ${context.technical.replace(/\n/g, ' · ')}\n\nPuedes preguntarme por materiales, gastos, presupuesto o riesgos.` }] : []);
+  const [messages, setMessages] = useState(() => context ? [{ role: 'assistant', text: `🏗️ Estoy revisando **${context.name}**.\n\n${context.summary}\n\n📐 ${context.technical.replace(/\n/g, ' · ')}\n\nPuedes preguntarme por materiales, gastos, presupuesto, riesgos o pedirme una revisión inteligente.` }] : []);
 
   function ask(text = question) {
     const clean = text.trim();
