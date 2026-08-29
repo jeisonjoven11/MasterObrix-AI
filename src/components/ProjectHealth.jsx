@@ -1,4 +1,12 @@
 export default function ProjectHealth({ project, budgets = [], expenses = [], materials = [] }) {
+  const currencyByMarket = { CO: 'COP', ES: 'EUR', EU: 'EUR', GB: 'GBP', MX: 'MXN', OTHER: 'USD' };
+  const currency = currencyByMarket[project.market] || 'USD';
+  const formatMoney = value => new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+
   const budget = Math.max(
     Number(project.budget || 0),
     budgets.filter(b => b.projectId === project.id).reduce((s, b) => s + Number(b.total || 0), 0)
@@ -32,7 +40,7 @@ export default function ProjectHealth({ project, budgets = [], expenses = [], ma
     {budget > 0 && <div className="health-bar"><i style={{ width: `${Math.min(projectedPercent, 100)}%` }} /></div>}
     <small>
       {budget > 0
-        ? `$${spent.toLocaleString()} gastados · $${pendingMaterials.toLocaleString()} pendientes en materiales · $${remaining.toLocaleString()} de margen proyectado`
+        ? `${formatMoney(spent)} gastados · ${formatMoney(pendingMaterials)} pendientes en materiales · ${formatMoney(remaining)} de margen proyectado`
         : 'Define un presupuesto para controlar el consumo.'}
     </small>
   </div>;
