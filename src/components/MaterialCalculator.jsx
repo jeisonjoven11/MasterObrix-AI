@@ -39,7 +39,6 @@ export default function MaterialCalculator({ onClose, onAddToBudget }) {
     const l = Number(length) || 0;
     const w = Number(width) || 0;
     const h = Number(height) || 0;
-
     if (material === 'wall') return l && h ? l * h : 0;
     if (material === 'concrete') return l && w ? l * w * (h || 0.1) : 0;
     if (material === 'paint') return l && w ? l * w : 0;
@@ -93,13 +92,18 @@ export default function MaterialCalculator({ onClose, onAddToBudget }) {
 
   function add() {
     if (!displayQuantity) return;
+    const total = Number(estimatedTotal.toFixed(2));
+    const effectiveUnitPrice = priceMode === 'unit'
+      ? Number(unitPrice) || 0
+      : displayQuantity ? Number((total / displayQuantity).toFixed(4)) : 0;
+
     onAddToBudget?.({
       description: item.label,
       category: 'Materiales',
       quantity: Number(displayQuantity.toFixed(2)),
       unit: displayUnit,
-      unitPrice: priceMode === 'unit' ? Number(unitPrice) || 0 : 0,
-      total: Number(estimatedTotal.toFixed(2)),
+      unitPrice: effectiveUnitPrice,
+      total,
       calculation: {
         base: Number(baseResult.toFixed(2)),
         waste: Number(waste) || 0,
@@ -113,141 +117,22 @@ export default function MaterialCalculator({ onClose, onAddToBudget }) {
   return (
     <div className="modal-backdrop">
       <section className="project-form" aria-label="Calculadora de materiales">
-        <div className="form-heading">
-          <div>
-            <span className="eyebrow">HERRAMIENTA</span>
-            <h2>🧮 Calcular materiales</h2>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Cerrar">✕</button>
-        </div>
-
-        <p style={{ marginBottom: 18 }}>
-          Calcula cantidades, aplica una reserva de desperdicio, estima el costo y llévalo directamente al presupuesto.
-        </p>
-
-        <label>
-          Material
-          <select value={material} onChange={e => setMaterial(e.target.value)}>
-            {Object.entries(MATERIALS).map(([key, value]) => (
-              <option key={key} value={key}>{value.label}</option>
-            ))}
-          </select>
-        </label>
-
-        <div className="form-row">
-          <label>
-            Largo (m)
-            <input type="number" min="0" step="0.01" value={length} onChange={e => setLength(e.target.value)} placeholder="0" />
-          </label>
-          <label>
-            Ancho (m)
-            <input type="number" min="0" step="0.01" value={width} onChange={e => setWidth(e.target.value)} placeholder="0" />
-          </label>
-        </div>
-
-        {(material === 'wall' || material === 'concrete') && (
-          <label>
-            {material === 'wall' ? 'Alto (m)' : 'Espesor (m)'}
-            <input type="number" min="0" step="0.01" value={height} onChange={e => setHeight(e.target.value)} placeholder={material === 'wall' ? '2.5' : '0.10'} />
-          </label>
-        )}
-
-        {material === 'concrete' && (
-          <label>
-            Mezcla de referencia
-            <select value={mix} onChange={e => setMix(e.target.value)}>
-              {Object.entries(MIXES).map(([key, value]) => (
-                <option key={key} value={key}>{value.label}</option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        {material === 'block' && (
-          <>
-            <label>
-              Tipo de pieza
-              <select value={blockSize} onChange={e => setBlockSize(e.target.value)}>
-                {Object.entries(BLOCK_SIZES).map(([key, value]) => (
-                  <option key={key} value={key}>{value.label}</option>
-                ))}
-              </select>
-            </label>
-            {blockSize === 'custom' && (
-              <div className="form-row">
-                <label>Frente de pieza (cm)<input type="number" min="0" step="0.1" value={blockLength} onChange={e => setBlockLength(e.target.value)} placeholder="40" /></label>
-                <label>Alto de pieza (cm)<input type="number" min="0" step="0.1" value={blockHeight} onChange={e => setBlockHeight(e.target.value)} placeholder="20" /></label>
-              </div>
-            )}
-          </>
-        )}
-
-        {material === 'paint' && (
-          <div className="form-row">
-            <label>Rendimiento (m²/L)<input type="number" min="0" step="0.1" value={paintCoverage} onChange={e => setPaintCoverage(e.target.value)} placeholder="10" /></label>
-            <label>Capas<input type="number" min="1" max="10" step="1" value={paintCoats} onChange={e => setPaintCoats(e.target.value)} /></label>
-          </div>
-        )}
-
-        <label>
-          Desperdicio / reserva (%)
-          <input type="number" min="0" max="100" step="0.5" value={waste} onChange={e => setWaste(e.target.value)} />
-        </label>
-
-        <div className="budget-summary">
-          <div><span>Cantidad base</span><strong>{baseResult.toLocaleString(undefined, { maximumFractionDigits: 2 })} {item.unit}</strong></div>
-          <div><span>Resultado con reserva</span><strong>{displayQuantity.toLocaleString(undefined, { maximumFractionDigits: 2 })} {displayUnit}</strong></div>
-        </div>
-
-        {concreteBreakdown && (
-          <div className="budget-summary">
-            <strong>🧱 Materiales estimados</strong>
-            <div><span>🪨 Cemento</span><strong>{concreteBreakdown.cement} sacos aprox. de 50 kg</strong></div>
-            <div><span>🏖️ Arena</span><strong>{concreteBreakdown.sand.toFixed(2)} m³</strong></div>
-            <div><span>🪨 Grava</span><strong>{concreteBreakdown.gravel.toFixed(2)} m³</strong></div>
-            <div><span>💧 Agua</span><strong>{Math.round(concreteBreakdown.water)} litros</strong></div>
-            <small>⚠️ Dosificación de referencia. La resistencia, granulometría, humedad, tipo de cemento y diseño de mezcla deben verificarse según las especificaciones del proyecto y por el profesional responsable.</small>
-          </div>
-        )}
-
-        {blockBreakdown && (
-          <div className="budget-summary">
-            <strong>🧱 Bloques / ladrillos estimados</strong>
-            <div><span>Piezas necesarias</span><strong>{blockBreakdown.pieces.toLocaleString('es-CO')} unidades</strong></div>
-            <small>Estimación por área visible. Juntas, cortes, vanos y modulación deben verificarse antes de comprar.</small>
-          </div>
-        )}
-
-        {paintBreakdown && (
-          <div className="budget-summary">
-            <strong>🎨 Pintura estimada</strong>
-            <div><span>Litros necesarios</span><strong>{paintBreakdown.liters.toFixed(1)} L</strong></div>
-            <small>El rendimiento real depende de la superficie, producto, absorción y método de aplicación.</small>
-          </div>
-        )}
-
-        <div className="budget-summary">
-          <strong>💰 Estimar costo</strong>
-          <label>
-            Precio
-            <select value={priceMode} onChange={e => setPriceMode(e.target.value)}>
-              <option value="unit">Por {displayUnit}</option>
-              <option value="total">Costo total</option>
-            </select>
-            <input type="number" min="0" step="1" value={unitPrice} onChange={e => setUnitPrice(e.target.value)} placeholder="Ej. 45000" />
-          </label>
-          {estimatedTotal > 0 && <div><span>Costo estimado</span><strong>${estimatedTotal.toLocaleString('es-CO')}</strong></div>}
-          <small>El precio es editable y sirve como estimación; después podremos conectarlo con precios reales de proveedores.</small>
-        </div>
-
-        <div className="budget-summary">
-          <small>⚠️ Las cantidades son estimaciones de referencia y no sustituyen planos, memorias de cálculo, especificaciones técnicas ni la verificación del profesional responsable.</small>
-        </div>
-
-        <div className="form-row">
-          <button className="primary form-submit" type="button" disabled={!displayQuantity} onClick={add}>Añadir al presupuesto</button>
-          <button className="form-submit" type="button" onClick={onClose}>Listo</button>
-        </div>
+        <div className="form-heading"><div><span className="eyebrow">HERRAMIENTA</span><h2>🧮 Calcular materiales</h2></div><button type="button" onClick={onClose} aria-label="Cerrar">✕</button></div>
+        <p style={{ marginBottom: 18 }}>Calcula cantidades, aplica una reserva de desperdicio, estima el costo y llévalo directamente al presupuesto.</p>
+        <label>Material<select value={material} onChange={e => setMaterial(e.target.value)}>{Object.entries(MATERIALS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select></label>
+        <div className="form-row"><label>Largo (m)<input type="number" min="0" step="0.01" value={length} onChange={e => setLength(e.target.value)} placeholder="0" /></label><label>Ancho (m)<input type="number" min="0" step="0.01" value={width} onChange={e => setWidth(e.target.value)} placeholder="0" /></label></div>
+        {(material === 'wall' || material === 'concrete') && <label>{material === 'wall' ? 'Alto (m)' : 'Espesor (m)'}<input type="number" min="0" step="0.01" value={height} onChange={e => setHeight(e.target.value)} placeholder={material === 'wall' ? '2.5' : '0.10'} /></label>}
+        {material === 'concrete' && <label>Mezcla de referencia<select value={mix} onChange={e => setMix(e.target.value)}>{Object.entries(MIXES).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select></label>}
+        {material === 'block' && <><label>Tipo de pieza<select value={blockSize} onChange={e => setBlockSize(e.target.value)}>{Object.entries(BLOCK_SIZES).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select></label>{blockSize === 'custom' && <div className="form-row"><label>Frente de pieza (cm)<input type="number" min="0" step="0.1" value={blockLength} onChange={e => setBlockLength(e.target.value)} placeholder="40" /></label><label>Alto de pieza (cm)<input type="number" min="0" step="0.1" value={blockHeight} onChange={e => setBlockHeight(e.target.value)} placeholder="20" /></label></div>}</>}
+        {material === 'paint' && <div className="form-row"><label>Rendimiento (m²/L)<input type="number" min="0" step="0.1" value={paintCoverage} onChange={e => setPaintCoverage(e.target.value)} placeholder="10" /></label><label>Capas<input type="number" min="1" max="10" step="1" value={paintCoats} onChange={e => setPaintCoats(e.target.value)} /></label></div>}
+        <label>Desperdicio / reserva (%)<input type="number" min="0" max="100" step="0.5" value={waste} onChange={e => setWaste(e.target.value)} /></label>
+        <div className="budget-summary"><div><span>Cantidad base</span><strong>{baseResult.toLocaleString(undefined, { maximumFractionDigits: 2 })} {item.unit}</strong></div><div><span>Resultado con reserva</span><strong>{displayQuantity.toLocaleString(undefined, { maximumFractionDigits: 2 })} {displayUnit}</strong></div></div>
+        {concreteBreakdown && <div className="budget-summary"><strong>🧱 Materiales estimados</strong><div><span>🪨 Cemento</span><strong>{concreteBreakdown.cement} sacos aprox. de 50 kg</strong></div><div><span>🏖️ Arena</span><strong>{concreteBreakdown.sand.toFixed(2)} m³</strong></div><div><span>🪨 Grava</span><strong>{concreteBreakdown.gravel.toFixed(2)} m³</strong></div><div><span>💧 Agua</span><strong>{Math.round(concreteBreakdown.water)} litros</strong></div><small>⚠️ Dosificación de referencia. La resistencia, granulometría, humedad, tipo de cemento y diseño de mezcla deben verificarse según las especificaciones del proyecto y por el profesional responsable.</small></div>}
+        {blockBreakdown && <div className="budget-summary"><strong>🧱 Bloques / ladrillos estimados</strong><div><span>Piezas necesarias</span><strong>{blockBreakdown.pieces.toLocaleString('es-CO')} unidades</strong></div><small>Estimación por área visible. Juntas, cortes, vanos y modulación deben verificarse antes de comprar.</small></div>}
+        {paintBreakdown && <div className="budget-summary"><strong>🎨 Pintura estimada</strong><div><span>Litros necesarios</span><strong>{paintBreakdown.liters.toFixed(1)} L</strong></div><small>El rendimiento real depende de la superficie, producto, absorción y método de aplicación.</small></div>}
+        <div className="budget-summary"><strong>💰 Estimar costo</strong><label>Precio<select value={priceMode} onChange={e => setPriceMode(e.target.value)}><option value="unit">Por {displayUnit}</option><option value="total">Costo total</option></select><input type="number" min="0" step="1" value={unitPrice} onChange={e => setUnitPrice(e.target.value)} placeholder="Ej. 45000" /></label>{estimatedTotal > 0 && <div><span>Costo estimado</span><strong>${estimatedTotal.toLocaleString('es-CO')}</strong></div>}<small>El precio es editable y sirve como estimación; después podremos conectarlo con precios reales de proveedores.</small></div>
+        <div className="budget-summary"><small>⚠️ Las cantidades son estimaciones de referencia y no sustituyen planos, memorias de cálculo, especificaciones técnicas ni la verificación del profesional responsable.</small></div>
+        <div className="form-row"><button className="primary form-submit" type="button" disabled={!displayQuantity} onClick={add}>Añadir al presupuesto</button><button className="form-submit" type="button" onClick={onClose}>Listo</button></div>
       </section>
     </div>
   );
