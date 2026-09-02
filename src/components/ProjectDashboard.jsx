@@ -15,8 +15,8 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
   const planned = Math.max(0, Number(project.budget || 0));
   const remaining = planned - spent;
   const materialMissing = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)), 0);
-  const materialSpent = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.spent || 0)), 0);
-  const pendingMaterialCost = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)) * Math.max(0, Number(m.unitPrice || 0)), 0);
+  const materialSpent = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.purchased || 0)) * Math.max(0, Number(m.price || 0)), 0);
+  const pendingMaterialCost = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)) * Math.max(0, Number(m.price || 0)), 0);
   const projectedCost = spent + pendingMaterialCost;
   const projectedBalance = planned - projectedCost;
   const consumed = planned > 0 ? (spent / planned) * 100 : 0;
