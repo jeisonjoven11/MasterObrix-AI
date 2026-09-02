@@ -77,7 +77,7 @@ function buildContext(project, budgets, expenses, materials) {
   const planned = Math.max(0, Number(project.budget || 0));
   const spent = projectExpenses.reduce((s, e) => s + Math.max(0, Number(e.amount || 0)), 0);
   const pendingUnits = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)), 0);
-  const pendingCost = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)) * Math.max(0, Number(m.unitPrice || 0)), 0);
+  const pendingCost = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)) * Math.max(0, Number(m.price || 0)), 0);
   const projected = spent + pendingCost;
   const consumed = planned > 0 ? Math.round((spent / planned) * 100) : 0;
   const projectedBalance = planned - projected;
@@ -92,7 +92,7 @@ function buildContext(project, budgets, expenses, materials) {
   if (planned > 0 && progress > 0 && consumed > progress + 15) warnings.push(`🟠 El gasto (${consumed}%) va bastante por delante del avance físico (${progress}%).`);
   if (planned > 0 && progress >= 80 && consumed < 60) warnings.push('🟢 El avance físico está alto respecto al gasto registrado; conviene verificar que no falten costos por registrar.');
   if (warnings.length === 0) warnings.push('🟢 No se detectaron alertas principales con los datos registrados.');
-  const nextAction = planned <= 0 ? 'Define el presupuesto para activar el control financiero.' : projected > planned ? 'Revisa materiales pendientes y gastos antes de nuevas compras.' : pendingUnits > 0 ? `Revisa las ${money(pendingUnits)} unidades de materiales pendientes.` : progress > consumed + 15 ? 'Verifica que los gastos y compras estén actualizados antes de asumir que el margen es real.' : 'Continúa registrando compras, gastos y avance para mantener el diagnóstico actualizado.';
+  const nextAction = planned <= 0 ? 'Define el presupuesto para activar el control financiero.' : projected > planned ? 'Revisa materiales pendientes y gastos antes de nuevas compras.' : pendingUnits > 0 ? `Revisa las ${number(pendingUnits)} unidades de materiales pendientes.` : progress > consumed + 15 ? 'Verifica que los gastos y compras estén actualizados antes de asumir que el margen es real.' : 'Continúa registrando compras, gastos y avance para mantener el diagnóstico actualizado.';
   const technical = [
     project.projectType && `Tipo: ${project.projectType}`,
     project.area !== '' && `Área: ${money(project.area)} m²`,
@@ -107,12 +107,16 @@ function buildContext(project, budgets, expenses, materials) {
     name: project.name,
     summary: `Estado: ${status}\nPresupuesto: ${money(planned)}\nGastado: ${money(spent)} (${consumed}%)\nCosto proyectado: ${money(projected)}\nSaldo proyectado: ${money(projectedBalance)}`,
     technical,
-    materialSummary: `🧱 Materiales registrados: ${projectMaterials.length}\nUnidades pendientes: ${money(pendingUnits)}\nCosto pendiente estimado: ${money(pendingCost)}\n\nEstos datos provienen de los registros actuales de la obra. Verifica cantidades antes de comprar.`,
+    materialSummary: `🧱 Materiales registrados: ${projectMaterials.length}\nUnidades pendientes: ${number(pendingUnits)}\nCosto pendiente estimado: ${money(pendingCost)}\n\nEstos datos provienen de los registros actuales de la obra. Verifica cantidades antes de comprar.`,
     financialSummary: `💰 Presupuesto: ${money(planned)}\n💸 Gastado: ${money(spent)}\n📈 Costo proyectado: ${money(projected)}\n📊 Saldo proyectado: ${money(projectedBalance)}\n\nEstado: ${status}`,
     diagnostic: warnings.join('\n'),
     nextAction,
     budgetCount: projectBudgets.length
   };
+}
+
+function number(value) {
+  return new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Number(value) || 0);
 }
 
 export default function AssistantPanel({ onClose, project, budgets = [], expenses = [], materials = [] }) {
