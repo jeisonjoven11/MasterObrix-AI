@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const CATALOGS = {
   CO: [
@@ -49,13 +49,19 @@ const MARKET_META = {
 };
 
 function makeId(){return globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}`}
+function supportedMarket(projectMarket){return ['CO','ES','EU'].includes(projectMarket)?projectMarket:'CO'}
 function money(value, market){return new Intl.NumberFormat(market==='CO'?'es-CO':'es-ES',{style:'currency',currency:MARKET_META[market].currency,maximumFractionDigits:MARKET_META[market].decimals}).format(value)}
 
 export default function ProjectMaterials({ projects, materials, initialProjectId='', onSave, onAddExpense, onClose }) {
   const [projectId,setProjectId]=useState(initialProjectId || projects[0]?.id||'');
-  const [market,setMarket]=useState('CO');
+  const initialMarket=supportedMarket(projects.find(p=>p.id===(initialProjectId || projects[0]?.id))?.market);
+  const [market,setMarket]=useState(initialMarket);
   const [name,setName]=useState(''); const [unit,setUnit]=useState('sacos');
   const [needed,setNeeded]=useState(''); const [purchased,setPurchased]=useState(''); const [price,setPrice]=useState(''); const [search,setSearch]=useState(''); const [category,setCategory]=useState('Todas');
+  useEffect(()=>{
+    const project=projects.find(p=>p.id===projectId);
+    if(project) changeMarket(supportedMarket(project.market));
+  },[projectId]);
   const catalogBase=CATALOGS[market];
   const rows=materials.filter(m=>m.projectId===projectId);
   const totals=useMemo(()=>rows.reduce((a,m)=>{const n=Number(m.needed)||0,p=Number(m.purchased)||0,price=Number(m.price)||0;return {...a,needed:a.needed+n,purchased:a.purchased+p,spent:a.spent+p*price,pendingCost:a.pendingCost+Math.max(0,n-p)*price}}, {needed:0,purchased:0,spent:0,pendingCost:0}),[rows]);
@@ -74,7 +80,7 @@ export default function ProjectMaterials({ projects, materials, initialProjectId
     <div className="form-row">{categories.map(c=><button key={c} type="button" className={category===c?'primary form-submit':'form-submit'} onClick={()=>setCategory(c)}>{c}</button>)}</div>
     {(search||category!=='Todas')&&<div className="empty-state">{catalog.map(p=><button className="form-submit" type="button" key={p[0]} onClick={()=>useCatalog(p)}>{p[0]} · {p[2]} · {money(p[3],market)} / {p[1]}</button>)}{!catalog.length&&<p>No encontramos ese material en el catálogo de referencia.</p>}<small>Precios orientativos: confirmar proveedor, ciudad, impuestos y precio antes de comprar.</small></div>}
     <form onSubmit={add}><div className="form-row"><label>Material<input required value={name} onChange={e=>setName(e.target.value)} placeholder="Ej. Cemento" /></label><label>Unidad<select value={unit} onChange={e=>setUnit(e.target.value)}><option>sacos</option><option>sacos 25 kg</option><option>m³</option><option>m²</option><option>unidades</option><option>litros</option><option>kg</option><option>metros</option></select></label></div><div className="form-row"><label>Necesario<input required type="number" min="0" step="0.01" value={needed} onChange={e=>setNeeded(e.target.value)} /></label><label>Comprado<input type="number" min="0" step="0.01" value={purchased} onChange={e=>setPurchased(e.target.value)} /></label></div><label>Precio por unidad<input type="number" min="0" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} placeholder="0" /></label><button className="primary form-submit">➕ Agregar material</button></form>
-    {rows.length>0&&<div className="budget-summary">{rows.map(m=>{const n=Number(m.needed)||0,p=Number(m.purchased)||0,missing=Math.max(0,n-p),purchaseTotal=p*(Number(m.price)||0),progress=n?Math.min(100,Math.round(p/n*100)):0;return <div key={m.id}><span><strong>{m.name}</strong><small> {p}/{n} {m.unit} · {progress}%</small><progress max="100" value={progress} aria-label={`Progreso de ${m.name}: ${progress}%`}></progress></span><strong>{missing?`Faltan ${missing} ${m.unit}`:'✓ Completo'} · {money(purchaseTotal,m.market||market)} {purchaseTotal>0&&<button type="button" onClick={()=>registerPurchase(m)}>Registrar gasto</button>}</strong></div>})}</div>}
+    {rows.length>0&&<div className="budget-summary">{rows.map(m=>{const n=Number(m.needed)||0,p=Number(m.purchased)||0,missing=Math.max(0,n-p),purchaseTotal=p*(Number(m.price)||0),progress=n?Math.min(100,Math.round(p/n*100)):0;return <div key={m.id}><span><strong>{m.name}</strong><small> {p}/{n} {m.unit} · {progress}%</small><progress max="100" value={progress} aria-label={`Progreso de ${m.name}: ${progress}%`}></progress></span><strong>{missing?`Faltan ${missing} ${m.unit}`:'✓ Completo'} · {money(purchaseTotal,m.market||market)}</strong></div>})}</div>}
     <small>⚠️ Las cantidades, precios y especificaciones son referencias. Verifica disponibilidad, transporte, impuestos, normativa y requisitos técnicos con el proveedor y profesional responsable.</small>
     <button className="form-submit" type="button" onClick={onClose}>Listo</button>
   </section></div>;
