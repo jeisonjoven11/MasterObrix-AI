@@ -12,7 +12,8 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
   const market = project.market || 'CO';
   const budgeted = projectBudgets.reduce((s, b) => s + Math.max(0, Number(b.total || 0)), 0);
   const spent = projectExpenses.reduce((s, e) => s + Math.max(0, Number(e.amount || 0)), 0);
-  const planned = Math.max(0, Number(project.budget || 0));
+  // Use the larger of the project's contract/budget value and linked quote totals so the dashboard remains coherent when the user creates the quote after the project.
+  const planned = Math.max(0, Number(project.budget || 0), budgeted);
   const remaining = planned - spent;
   const materialMissing = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)), 0);
   const materialSpent = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.purchased || 0)) * Math.max(0, Number(m.price || 0)), 0);
