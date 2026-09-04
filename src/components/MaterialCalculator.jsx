@@ -40,7 +40,8 @@ export default function MaterialCalculator({ onClose, onAddToBudget }) {
     const w = Number(width) || 0;
     const h = Number(height) || 0;
     if (material === 'wall') return l && h ? l * h : 0;
-    if (material === 'concrete') return l && w ? l * w * (h || 0.1) : 0;
+    // Never assume a concrete thickness: an implicit default can hide a costly input error.
+    if (material === 'concrete') return l && w && h ? l * w * h : 0;
     if (material === 'paint') return l && w ? l * w : 0;
     return l && w ? l * w : 0;
   }, [material, length, width, height]);
