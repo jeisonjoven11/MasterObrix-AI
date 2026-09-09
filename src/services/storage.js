@@ -4,12 +4,22 @@ const BUDGETS_KEY = 'masterobrix-budgets';
 const EXPENSES_KEY = 'masterobrix-expenses';
 
 function read(key) {
-  try { return JSON.parse(localStorage.getItem(key) || '[]'); }
-  catch { return []; }
+  try {
+    const raw = localStorage.getItem(key);
+    const value = raw ? JSON.parse(raw) : [];
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
 }
 
 function write(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(Array.isArray(value) ? value : []));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export const storage = {
