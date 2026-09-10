@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 
 const currencyMap = { CO: 'COP', ES: 'EUR', EU: 'EUR', GB: 'GBP', MX: 'MXN', OTHER: 'USD' };
-const money = (value, market = 'CO') => new Intl.NumberFormat('es-CO', { style: 'currency', currency: currencyMap[market] || 'USD', maximumFractionDigits: 0 }).format(Number(value) || 0);
-const number = (value) => Math.round(Number(value) || 0).toLocaleString('es-CO');
+const localeMap = { CO: 'es-CO', ES: 'es-ES', EU: 'es-ES', GB: 'en-GB', MX: 'es-MX', OTHER: 'en-US' };
+const money = (value, market = 'CO') => new Intl.NumberFormat(localeMap[market] || 'en-US', { style: 'currency', currency: currencyMap[market] || 'USD', maximumFractionDigits: market === 'CO' ? 0 : 2 }).format(Number(value) || 0);
+const number = (value, market = 'CO') => Math.round(Number(value) || 0).toLocaleString(localeMap[market] || 'en-US');
 const expenseQuantity = (expense, material) => {
   const explicit = Number(expense?.sourceQuantity);
   if (Number.isFinite(explicit) && explicit > 0) return explicit;
@@ -52,9 +53,9 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
   const alerts = useMemo(() => [
     ...(planned > 0 && spent > planned ? ['🔴 Los gastos reales ya superan el presupuesto.'] : []),
     ...(planned > 0 && consumed >= 80 && spent <= planned ? ['🟠 Has consumido el 80% o más del presupuesto.'] : []),
-    ...(materialMissing > 0 ? [`🧱 Faltan ${number(materialMissing)} unidades de materiales según los registros.`] : []),
+    ...(materialMissing > 0 ? [`🧱 Faltan ${number(materialMissing, market)} unidades de materiales según los registros.`] : []),
     ...(unregisteredMaterialCost > 0 ? [`💸 Hay ${money(unregisteredMaterialCost, market)} en materiales comprados que todavía no están registrados como gasto.`] : []),
-    ...(materialReconciliationIssues.length > 0 ? [`⚠️ ${number(materialReconciliationIssues.length)} material(es) tienen más cantidad registrada como gasto que cantidad actualmente comprada.`] : []),
+    ...(materialReconciliationIssues.length > 0 ? [`⚠️ ${number(materialReconciliationIssues.length, market)} material(es) tienen más cantidad registrada como gasto que cantidad actualmente comprada.`] : []),
     ...(planned > 0 && projectedCost > planned ? [`⚠️ El costo proyectado (${money(projectedCost, market)}) supera el presupuesto (${money(planned, market)}).`] : []),
   ], [planned, spent, consumed, materialMissing, unregisteredMaterialCost, materialReconciliationIssues.length, projectedCost, market]);
 
@@ -67,7 +68,7 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
         : unregisteredMaterialCost > 0
           ? 'Registra como gasto los materiales comprados para mantener la proyección financiera completa.'
           : materialMissing > 0
-            ? `Revisa las ${number(materialMissing)} unidades pendientes y confirma sus precios antes de comprar.`
+            ? `Revisa las ${number(materialMissing, market)} unidades pendientes y confirma sus precios antes de comprar.`
             : consumed >= 80
               ? 'Revisa los próximos gastos y evita comprometer compras no esenciales.'
               : 'Continúa registrando compras y gastos para mantener la proyección actualizada.';
@@ -76,10 +77,10 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
   const healthLabel = planned <= 0 ? 'Sin datos' : health >= 20 ? 'Margen saludable' : health >= 0 ? 'Margen ajustado' : 'Déficit proyectado';
   const technical = [
     ['Tipo', project.projectType || '—'],
-    ['Área', project.area ? `${number(project.area)} m²` : '—'],
-    ['Pisos', project.floors ? number(project.floors) : '—'],
-    ['Habitaciones', project.bedrooms !== '' && project.bedrooms != null ? number(project.bedrooms) : '—'],
-    ['Baños', project.bathrooms !== '' && project.bathrooms != null ? number(project.bathrooms) : '—'],
+    ['Área', project.area ? `${number(project.area, market)} m²` : '—'],
+    ['Pisos', project.floors ? number(project.floors, market) : '—'],
+    ['Habitaciones', project.bedrooms !== '' && project.bedrooms != null ? number(project.bedrooms, market) : '—'],
+    ['Baños', project.bathrooms !== '' && project.bathrooms != null ? number(project.bathrooms, market) : '—'],
     ['Bloque', project.blockType || '—'],
     ['Altura de muro', project.wallHeight ? `${project.wallHeight} m` : '—'],
   ];
@@ -97,7 +98,7 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
     <div className="budget-summary"><span>🤖 Recomendación MasterObrix</span><strong>{nextAction}</strong></div>
     <div className="budget-summary"><div><span>Salud financiera proyectada</span><strong>{healthLabel}</strong></div><small>{planned > 0 ? `Margen proyectado: ${health}% del presupuesto.` : 'Agrega un presupuesto para calcular el margen.'}</small></div>
     {alerts.length > 0 ? <div className="empty-state" role="alert"><strong>⚠️ Atención</strong>{alerts.map(a => <p key={a}>{a}</p>)}</div> : <div className="empty-state"><strong>✅ Sin alertas</strong><p>La información registrada no muestra riesgos financieros o de materiales en este momento.</p></div>}
-    <div className="section-heading"><h3>Acciones de la obra</h3><span>{number(projectMaterials.length)} materiales</span></div>
+    <div className="section-heading"><h3>Acciones de la obra</h3><span>{number(projectMaterials.length, market)} materiales</span></div>
     <div className="action-grid">
       <button className="action-card ai-action" type="button" onClick={() => onOpenAssistant(project.id)}><span className="action-icon">🤖</span><strong>Analizar con MasterObrix AI</strong><small>Pregunta por el estado, materiales y riesgos</small></button>
       <button className="action-card" type="button" onClick={() => onOpenMaterials(project.id)}><span className="action-icon">🧱</span><strong>Materiales</strong><small>Necesarios y comprados</small></button>
@@ -106,7 +107,7 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
       <button className="action-card" type="button" onClick={() => onOpenProfitability(project.id)}><span className="action-icon">📈</span><strong>Rentabilidad</strong><small>Ver margen de la obra</small></button>
     </div>
     <button className="form-submit" type="button" onClick={() => setShowAll(v => !v)}>{showAll ? 'Ocultar resumen' : 'Ver resumen de actividad'}</button>
-    {showAll && <div className="budget-summary"><div><span>Presupuestos</span><strong>{number(projectBudgets.length)}</strong></div><div><span>Gastos registrados</span><strong>{number(projectExpenses.length)}</strong></div><div><span>Materiales registrados</span><strong>{number(projectMaterials.length)}</strong></div><div><span>Pendiente de compra</span><strong>{number(materialMissing)} unidades</strong></div></div>}
+    {showAll && <div className="budget-summary"><div><span>Presupuestos</span><strong>{number(projectBudgets.length, market)}</strong></div><div><span>Gastos registrados</span><strong>{number(projectExpenses.length, market)}</strong></div><div><span>Materiales registrados</span><strong>{number(projectMaterials.length, market)}</strong></div><div><span>Pendiente de compra</span><strong>{number(materialMissing, market)} unidades</strong></div></div>}
     <button className="form-submit" type="button" onClick={onClose}>Cerrar</button>
   </section></div>;
 }
