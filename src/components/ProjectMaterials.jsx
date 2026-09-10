@@ -25,7 +25,11 @@ export default function ProjectMaterials({ projects, materials, initialProjectId
   const [market,setMarket]=useState(initialMarket);
   const [name,setName]=useState(''); const [unit,setUnit]=useState('sacos'); const [needed,setNeeded]=useState(''); const [purchased,setPurchased]=useState(''); const [price,setPrice]=useState(''); const [search,setSearch]=useState(''); const [category,setCategory]=useState('Todas');
   const [registeredExpenses,setRegisteredExpenses]=useState(readMaterialExpenses);
-  useEffect(()=>{setRegisteredExpenses(readMaterialExpenses())},[materials]);
+  const refreshRegisteredExpenses=()=>setRegisteredExpenses(readMaterialExpenses());
+  useEffect(()=>{refreshRegisteredExpenses()},[materials]);
+  useEffect(()=>{const handleStorage=event=>{if(!event.key||event.key==='masterobrix-expenses')refreshRegisteredExpenses()};window.addEventListener('storage',handleStorage);const timer=window.setInterval(refreshRegisteredExpenses,1000);return()=>{window.removeEventListener('storage',handleStorage);window.clearInterval(timer)}},[]);
+  useEffect(()=>{setRegisteredExpenses(current=>{const latest=readMaterialExpenses();return JSON.stringify(current)===JSON.stringify(latest)?current:latest})},[materials]);
+  useEffect(()=>{setProjectId(current=>current||initialProjectId||projects[0]?.id||'')},[initialProjectId,projects]);
   useEffect(()=>{const project=projects.find(p=>p.id===projectId);if(project) changeMarket(supportedMarket(project.market));},[projectId]);
   const catalogBase=CATALOGS[market]; const rows=materials.filter(m=>m.projectId===projectId);
   const registeredByMaterial=useMemo(()=>registeredExpenses.reduce((map,expense)=>{const id=expense.sourceMaterialId;if(!id)return map;const material=materials.find(m=>m.id===id);map[id]=(map[id]||0)+expenseQuantity(expense,material);return map},{}),[registeredExpenses,materials]);
