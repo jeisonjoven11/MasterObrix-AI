@@ -12,13 +12,17 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
   const market = project.market || 'CO';
   const budgeted = projectBudgets.reduce((s, b) => s + Math.max(0, Number(b.total || 0)), 0);
   const spent = projectExpenses.reduce((s, e) => s + Math.max(0, Number(e.amount || 0)), 0);
-  // Use the larger of the project's contract/budget value and linked quote totals so the dashboard remains coherent when the user creates the quote after the project.
   const planned = Math.max(0, Number(project.budget || 0), budgeted);
   const remaining = planned - spent;
   const materialMissing = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)), 0);
   const materialSpent = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.purchased || 0)) * Math.max(0, Number(m.price || 0)), 0);
   const pendingMaterialCost = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)) * Math.max(0, Number(m.price || 0)), 0);
-  const projectedCost = spent + pendingMaterialCost;
+  const registeredMaterialIds = new Set(projectExpenses.filter(e => e.source === 'project-materials' && e.sourceMaterialId).map(e => e.sourceMaterialId));
+  const unregisteredMaterialCost = projectMaterials.reduce((s, m) => {
+    if (registeredMaterialIds.has(m.id)) return s;
+    return s + Math.max(0, Number(m.purchased || 0)) * Math.max(0, Number(m.price || 0));
+  }, 0);
+  const projectedCost = spent + unregisteredMaterialCost + pendingMaterialCost;
   const projectedBalance = planned - projectedCost;
   const consumed = planned > 0 ? (spent / planned) * 100 : 0;
   const physicalProgress = Math.min(100, Math.max(0, Number(project.progress || 0)));
@@ -29,18 +33,21 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
     ...(planned > 0 && spent > planned ? ['🔴 Los gastos reales ya superan el presupuesto.'] : []),
     ...(planned > 0 && consumed >= 80 && spent <= planned ? ['🟠 Has consumido el 80% o más del presupuesto.'] : []),
     ...(materialMissing > 0 ? [`🧱 Faltan ${number(materialMissing)} unidades de materiales según los registros.`] : []),
+    ...(unregisteredMaterialCost > 0 ? [`💸 Hay ${money(unregisteredMaterialCost, market)} en materiales comprados que todavía no están registrados como gasto.`] : []),
     ...(planned > 0 && projectedCost > planned ? [`⚠️ El costo proyectado (${money(projectedCost, market)}) supera el presupuesto (${money(planned, market)}).`] : []),
-  ], [planned, spent, consumed, materialMissing, projectedCost, market]);
+  ], [planned, spent, consumed, materialMissing, unregisteredMaterialCost, projectedCost, market]);
 
   const nextAction = planned <= 0
     ? 'Define el presupuesto de la obra para activar el control financiero.'
     : projectedCost > planned
       ? 'Revisa materiales pendientes y gastos adicionales antes de realizar nuevas compras.'
-      : materialMissing > 0
-        ? `Revisa las ${number(materialMissing)} unidades pendientes y confirma sus precios antes de comprar.`
-        : consumed >= 80
-          ? 'Revisa los próximos gastos y evita comprometer compras no esenciales.'
-          : 'Continúa registrando compras y gastos para mantener la proyección actualizada.';
+      : unregisteredMaterialCost > 0
+        ? 'Registra como gasto los materiales comprados para mantener la proyección financiera completa.'
+        : materialMissing > 0
+          ? `Revisa las ${number(materialMissing)} unidades pendientes y confirma sus precios antes de comprar.`
+          : consumed >= 80
+            ? 'Revisa los próximos gastos y evita comprometer compras no esenciales.'
+            : 'Continúa registrando compras y gastos para mantener la proyección actualizada.';
 
   const health = planned <= 0 ? 0 : Math.max(0, Math.min(100, Math.round((projectedBalance / planned) * 100)));
   const healthLabel = planned <= 0 ? 'Sin datos' : health >= 20 ? 'Margen saludable' : health >= 0 ? 'Margen ajustado' : 'Déficit proyectado';
