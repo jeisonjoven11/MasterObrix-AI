@@ -3,6 +3,15 @@ import { useMemo, useState } from 'react';
 const currencyMap = { CO: 'COP', ES: 'EUR', EU: 'EUR', GB: 'GBP', MX: 'MXN', OTHER: 'USD' };
 const money = (value, market = 'CO') => new Intl.NumberFormat('es-CO', { style: 'currency', currency: currencyMap[market] || 'USD', maximumFractionDigits: 0 }).format(Number(value) || 0);
 const number = (value) => Math.round(Number(value) || 0).toLocaleString('es-CO');
+const expenseQuantity = (expense, material) => {
+  const explicit = Number(expense?.sourceQuantity);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const amount = Number(expense?.amount) || 0;
+  const historicalPrice = Number(expense?.sourceUnitPrice);
+  if (historicalPrice > 0) return amount / historicalPrice;
+  const currentPrice = Number(material?.price) || 0;
+  return currentPrice > 0 ? amount / currentPrice : 0;
+};
 
 export default function ProjectDashboard({ project, budgets, expenses, materials, onClose, onOpenMaterials, onOpenExpenses, onOpenProfitability, onOpenBudget, onOpenAssistant }) {
   const [showAll, setShowAll] = useState(false);
@@ -17,11 +26,22 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
   const materialMissing = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)), 0);
   const materialSpent = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.purchased || 0)) * Math.max(0, Number(m.price || 0)), 0);
   const pendingMaterialCost = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)) * Math.max(0, Number(m.price || 0)), 0);
-  const registeredMaterialIds = new Set(projectExpenses.filter(e => e.source === 'project-materials' && e.sourceMaterialId).map(e => e.sourceMaterialId));
+  const registeredMaterialQuantities = useMemo(() => projectExpenses.reduce((map, expense) => {
+    if (expense.source !== 'project-materials' || !expense.sourceMaterialId) return map;
+    const material = projectMaterials.find(m => m.id === expense.sourceMaterialId);
+    map[expense.sourceMaterialId] = (map[expense.sourceMaterialId] || 0) + expenseQuantity(expense, material);
+    return map;
+  }, {}), [projectExpenses, projectMaterials]);
   const unregisteredMaterialCost = projectMaterials.reduce((s, m) => {
-    if (registeredMaterialIds.has(m.id)) return s;
-    return s + Math.max(0, Number(m.purchased || 0)) * Math.max(0, Number(m.price || 0));
+    const purchased = Math.max(0, Number(m.purchased || 0));
+    const registered = Math.max(0, Number(registeredMaterialQuantities[m.id]) || 0);
+    return s + Math.max(0, purchased - registered) * Math.max(0, Number(m.price || 0));
   }, 0);
+  const materialReconciliationIssues = projectMaterials.filter(m => {
+    const purchased = Math.max(0, Number(m.purchased || 0));
+    const registered = Math.max(0, Number(registeredMaterialQuantities[m.id]) || 0);
+    return registered > purchased + 0.0001;
+  });
   const projectedCost = spent + unregisteredMaterialCost + pendingMaterialCost;
   const projectedBalance = planned - projectedCost;
   const consumed = planned > 0 ? (spent / planned) * 100 : 0;
@@ -34,20 +54,23 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
     ...(planned > 0 && consumed >= 80 && spent <= planned ? ['🟠 Has consumido el 80% o más del presupuesto.'] : []),
     ...(materialMissing > 0 ? [`🧱 Faltan ${number(materialMissing)} unidades de materiales según los registros.`] : []),
     ...(unregisteredMaterialCost > 0 ? [`💸 Hay ${money(unregisteredMaterialCost, market)} en materiales comprados que todavía no están registrados como gasto.`] : []),
+    ...(materialReconciliationIssues.length > 0 ? [`⚠️ ${number(materialReconciliationIssues.length)} material(es) tienen más cantidad registrada como gasto que cantidad actualmente comprada.`] : []),
     ...(planned > 0 && projectedCost > planned ? [`⚠️ El costo proyectado (${money(projectedCost, market)}) supera el presupuesto (${money(planned, market)}).`] : []),
-  ], [planned, spent, consumed, materialMissing, unregisteredMaterialCost, projectedCost, market]);
+  ], [planned, spent, consumed, materialMissing, unregisteredMaterialCost, materialReconciliationIssues.length, projectedCost, market]);
 
   const nextAction = planned <= 0
     ? 'Define el presupuesto de la obra para activar el control financiero.'
-    : projectedCost > planned
-      ? 'Revisa materiales pendientes y gastos adicionales antes de realizar nuevas compras.'
-      : unregisteredMaterialCost > 0
-        ? 'Registra como gasto los materiales comprados para mantener la proyección financiera completa.'
-        : materialMissing > 0
-          ? `Revisa las ${number(materialMissing)} unidades pendientes y confirma sus precios antes de comprar.`
-          : consumed >= 80
-            ? 'Revisa los próximos gastos y evita comprometer compras no esenciales.'
-            : 'Continúa registrando compras y gastos para mantener la proyección actualizada.';
+    : materialReconciliationIssues.length > 0
+      ? 'Revisa los registros de compras de materiales que superan la cantidad actualmente comprada.'
+      : projectedCost > planned
+        ? 'Revisa materiales pendientes y gastos adicionales antes de realizar nuevas compras.'
+        : unregisteredMaterialCost > 0
+          ? 'Registra como gasto los materiales comprados para mantener la proyección financiera completa.'
+          : materialMissing > 0
+            ? `Revisa las ${number(materialMissing)} unidades pendientes y confirma sus precios antes de comprar.`
+            : consumed >= 80
+              ? 'Revisa los próximos gastos y evita comprometer compras no esenciales.'
+              : 'Continúa registrando compras y gastos para mantener la proyección actualizada.';
 
   const health = planned <= 0 ? 0 : Math.max(0, Math.min(100, Math.round((projectedBalance / planned) * 100)));
   const healthLabel = planned <= 0 ? 'Sin datos' : health >= 20 ? 'Margen saludable' : health >= 0 ? 'Margen ajustado' : 'Déficit proyectado';
