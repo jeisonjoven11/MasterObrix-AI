@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 
 const emptyItem = { description: '', category: 'Materiales', quantity: '', unit: 'unidad', unitPrice: '' };
+const CATEGORIES = new Set(['Materiales', 'Mano de obra', 'Otros']);
+const UNITS = new Set(['unidad', 'm', 'm²', 'm³', 'kg', 'l', 'hora', 'día']);
 const currencyByMarket = { CO: { code: 'COP', locale: 'es-CO' }, ES: { code: 'EUR', locale: 'es-ES' }, EU: { code: 'EUR', locale: 'es-ES' }, GB: { code: 'GBP', locale: 'en-GB' }, MX: { code: 'MXN', locale: 'es-MX' }, OTHER: { code: 'USD', locale: 'en-US' } };
 
 function makeId(){return globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}`}
@@ -8,6 +10,7 @@ function positiveNumber(value) { const number = Number(value); return Number.isF
 function nonNegativeNumber(value) { const number = Number(value); return Number.isFinite(number) && number >= 0 ? number : 0; }
 function boundedPercent(value, max) { return Math.min(max, Math.max(0, nonNegativeNumber(value))); }
 function roundMoney(value) { return Number(nonNegativeNumber(value).toFixed(2)); }
+function validPrice(value) { return value !== '' && value !== null && value !== undefined && Number.isFinite(Number(value)) && Number(value) >= 0; }
 
 export default function BudgetEditor({ projects, initialItem, initialProjectId, onSave, onClose }) {
   const [projectId, setProjectId] = useState(initialProjectId || projects[0]?.id || '');
@@ -41,9 +44,12 @@ export default function BudgetEditor({ projects, initialItem, initialProjectId, 
   const removeItem = (index) => setItems((current) => current.length === 1 ? current : current.filter((_, i) => i !== index));
   function submit(event) {
     event.preventDefault();
-    const validItems = items.filter((item) => item.description.trim() && positiveNumber(item.quantity) > 0 && Number.isFinite(Number(item.unitPrice)) && nonNegativeNumber(item.unitPrice) >= 0);
-    if (!projectId || !validItems.length) return;
-    const normalizedItems = validItems.map((item) => ({ ...item, quantity: positiveNumber(item.quantity), unitPrice: roundMoney(item.unitPrice), total: roundMoney(itemTotal(item)) }));
+    const validItems = items.filter((item) => {
+      const description = typeof item.description === 'string' ? item.description.trim() : '';
+      return description && positiveNumber(item.quantity) > 0 && validPrice(item.unitPrice) && CATEGORIES.has(item.category) && UNITS.has(item.unit);
+    });
+    if (!projectId || !projects.some((item) => item.id === projectId) || !validItems.length) return;
+    const normalizedItems = validItems.map((item) => ({ ...item, description: item.description.trim(), quantity: positiveNumber(item.quantity), unitPrice: roundMoney(item.unitPrice), total: roundMoney(itemTotal(item)) }));
     onSave({ id: makeId(), projectId, items: normalizedItems, markup: markupRate, indirectPercent: indirectRate, directSubtotal, indirectCosts, subtotal: costBase, profit, total, categoryTotals, currency: currency.code, createdAt: new Date().toISOString() });
   }
   return <div className="modal-backdrop"><form className="budget-form" onSubmit={submit}>
