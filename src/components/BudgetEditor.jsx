@@ -50,7 +50,7 @@ export default function BudgetEditor({ projects, initialItem, initialProjectId, 
     });
     if (!projectId || !projects.some((item) => item.id === projectId) || !validItems.length) return;
     const normalizedItems = validItems.map((item) => ({ ...item, description: item.description.trim(), quantity: positiveNumber(item.quantity), unitPrice: roundMoney(item.unitPrice), total: roundMoney(itemTotal(item)) }));
-    onSave({ id: makeId(), projectId, items: normalizedItems, markup: markupRate, indirectPercent: indirectRate, directSubtotal, indirectCosts, subtotal: costBase, profit, total, categoryTotals, currency: currency.code, createdAt: new Date().toISOString() });
+    onSave({ id: initialItem?.id || makeId(), projectId, items: normalizedItems, markup: markupRate, indirectPercent: indirectRate, directSubtotal, indirectCosts, subtotal: costBase, profit, total, categoryTotals, currency: currency.code, createdAt: initialItem?.createdAt || new Date().toISOString() });
   }
   return <div className="modal-backdrop"><form className="budget-form" onSubmit={submit}>
     <div className="form-heading"><div><span className="eyebrow">NUEVO PRESUPUESTO</span><h2>Construir presupuesto</h2><small>Moneda: {currency.code}</small></div><button type="button" onClick={onClose}>✕</button></div>
