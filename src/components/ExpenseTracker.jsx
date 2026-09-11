@@ -11,7 +11,9 @@ export default function ExpenseTracker({ projects, expenses, initialProjectId = 
   const market = project?.market || 'CO';
   const currency = currencyByMarket[market] || currencyByMarket.OTHER;
   const money = (value) => new Intl.NumberFormat(currency.locale, { style: 'currency', currency: currency.code, maximumFractionDigits: 2 }).format(Number(value) || 0);
-  const projectExpenses = useMemo(() => expenses.filter((expense) => expense.projectId === projectId), [expenses, projectId]);
+  const projectExpenses = useMemo(() => expenses.filter((expense) => (
+    expense.projectId === projectId && (!expense.currency || expense.currency === currency.code)
+  )), [expenses, projectId, currency.code]);
   const totals = useMemo(() => projectExpenses.reduce((result, expense) => {
     const amount = Number(expense.amount);
     if (!Number.isFinite(amount) || amount <= 0) return result;
