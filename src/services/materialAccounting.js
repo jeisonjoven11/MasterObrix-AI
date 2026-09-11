@@ -1,10 +1,14 @@
-export function getMaterialSourceExpenses(expenses, materialId) {
+export function getMaterialSourceExpenses(expenses, materialId, currency) {
   if (!Array.isArray(expenses) || !materialId) return [];
-  return expenses.filter((expense) => expense?.source === 'project-materials' && expense?.sourceMaterialId === materialId);
+  return expenses.filter((expense) => {
+    if (expense?.source !== 'project-materials' || expense?.sourceMaterialId !== materialId) return false;
+    return !currency || !expense.currency || expense.currency === currency;
+  });
 }
 
 export function getRegisteredMaterialQuantity(expenses, material, materialId = material?.id) {
-  return getMaterialSourceExpenses(expenses, materialId).reduce((total, expense) => {
+  const currency = material?.currency;
+  return getMaterialSourceExpenses(expenses, materialId, currency).reduce((total, expense) => {
     const explicit = Number(expense?.sourceQuantity);
     if (Number.isFinite(explicit) && explicit > 0) return total + explicit;
 
