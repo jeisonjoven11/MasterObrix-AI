@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getMaterialRegistrationState } from '../services/materialAccounting.js';
+import { getRegisteredMaterialQuantity } from '../services/materialAccounting.js';
 
 const CATALOGS = {
   CO: [['Cemento gris 50 kg','sacos','Cemento',35000],['Arena de concreto','m³','Agregados',95000],['Grava','m³','Agregados',110000],['Bloque H4','unidades','Mampostería',4200],['Bloque H5','unidades','Mampostería',4800],['Ladrillo','unidades','Mampostería',1800],['Varilla corrugada','unidades','Acero',28000],['Mortero seco','sacos','Mampostería',22000],['Alambre recocido','kg','Acero',8500],['Pintura','litros','Acabados',18000],['Tubo PVC 1/2"','metros','Plomería',6500]],
@@ -17,20 +17,26 @@ const MARKET_META = {
 function makeId(){return globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}`}
 function supportedMarket(projectMarket){return CATALOGS[projectMarket]?projectMarket:'CO'}
 function money(value, market){const meta=MARKET_META[market]||MARKET_META.OTHER;return new Intl.NumberFormat(market==='CO'?'es-CO':market==='MX'?'es-MX':market==='GB'?'en-GB':'es-ES',{style:'currency',currency:meta.currency,maximumFractionDigits:meta.decimals}).format(Number(value)||0)}
+function readMaterialExpenses(){try{const raw=localStorage.getItem('masterobrix-expenses');const value=raw?JSON.parse(raw):[];return Array.isArray(value)?value.filter(e=>e?.source==='project-materials'&&e?.sourceMaterialId):[]}catch{return []}}
 
-export default function ProjectMaterials({ projects, materials, expenses = [], initialProjectId='', onSave, onAddExpense, onClose }) {
+export default function ProjectMaterials({ projects, materials, initialProjectId='', onSave, onAddExpense, onClose }) {
   const [projectId,setProjectId]=useState(initialProjectId || projects[0]?.id||'');
   const initialMarket=supportedMarket(projects.find(p=>p.id===(initialProjectId || projects[0]?.id))?.market);
   const [market,setMarket]=useState(initialMarket);
   const [name,setName]=useState(''); const [unit,setUnit]=useState('sacos'); const [needed,setNeeded]=useState(''); const [purchased,setPurchased]=useState(''); const [price,setPrice]=useState(''); const [search,setSearch]=useState(''); const [category,setCategory]=useState('Todas');
+  const [registeredExpenses,setRegisteredExpenses]=useState(readMaterialExpenses);
+  const refreshRegisteredExpenses=()=>setRegisteredExpenses(readMaterialExpenses());
+  useEffect(()=>{refreshRegisteredExpenses()},[materials]);
+  useEffect(()=>{const handleStorage=event=>{if(!event.key||event.key==='masterobrix-expenses')refreshRegisteredExpenses()};window.addEventListener('storage',handleStorage);const timer=window.setInterval(refreshRegisteredExpenses,1000);return()=>{window.removeEventListener('storage',handleStorage);window.clearInterval(timer)}},[]);
+  useEffect(()=>{setRegisteredExpenses(current=>{const latest=readMaterialExpenses();return JSON.stringify(current)===JSON.stringify(latest)?current:latest})},[materials]);
   useEffect(()=>{setProjectId(current=>current||initialProjectId||projects[0]?.id||'')},[initialProjectId,projects]);
   useEffect(()=>{const project=projects.find(p=>p.id===projectId);if(project) changeMarket(supportedMarket(project.market));},[projectId]);
   const catalogBase=CATALOGS[market]; const rows=materials.filter(m=>m.projectId===projectId);
-  const registeredByMaterial=useMemo(()=>rows.reduce((map,material)=>{map[material.id]=getMaterialRegistrationState(material,expenses).registered;return map},{}),[rows,expenses]);
+  const registeredByMaterial=useMemo(()=>registeredExpenses.reduce((map,expense)=>{const id=expense.sourceMaterialId;if(!id)return map;const material=materials.find(m=>m.id===id);map[id]=(map[id]||0)+getRegisteredMaterialQuantity([expense],material,id);return map},{}),[registeredExpenses,materials]);
   const totals=useMemo(()=>rows.reduce((a,m)=>{const n=Number(m.needed)||0,p=Number(m.purchased)||0,price=Number(m.price)||0;return {...a,needed:a.needed+n,purchased:a.purchased+p,spent:a.spent+p*price,pendingCost:a.pendingCost+Math.max(0,n-p)*price}}, {needed:0,purchased:0,spent:0,pendingCost:0}),[rows]);
   const categories=['Todas',...new Set(catalogBase.map(p=>p[2]))]; const catalog=catalogBase.filter(p=>(category==='Todas'||p[2]===category)&&`${p[0]} ${p[2]}`.toLowerCase().includes(search.toLowerCase()));
   function add(e){e.preventDefault();if(!projectId||!name.trim()||Number(needed)<=0)return;onSave({id:makeId(),projectId,name:name.trim(),unit,needed:Number(needed),purchased:Number(purchased)||0,price:Number(price)||0,market,currency:MARKET_META[market].currency});setName('');setNeeded('');setPurchased('');setPrice('');}
-  function registerPurchase(m){const { purchased:quantity, registered }=getMaterialRegistrationState(m,expenses),unitPrice=Number(m.price)||0,delta=quantity-registered;if(delta<=0||unitPrice<=0||!onAddExpense)return;const expense={id:makeId(),projectId:m.projectId,description:`Compra de ${m.name}`,category:'Materiales',amount:delta*unitPrice,date:new Date().toISOString().slice(0,10),market:m.market||market,currency:m.currency||MARKET_META[market].currency,source:'project-materials',sourceMaterialId:m.id,sourceQuantity:delta,sourceUnitPrice:unitPrice};onAddExpense(expense);}
+  function registerPurchase(m){const quantity=Number(m.purchased)||0,unitPrice=Number(m.price)||0,registered=Number(registeredByMaterial[m.id])||0,delta=quantity-registered;if(delta<=0||unitPrice<=0||!onAddExpense)return;const expense={id:makeId(),projectId:m.projectId,description:`Compra de ${m.name}`,category:'Materiales',amount:delta*unitPrice,date:new Date().toISOString().slice(0,10),market:m.market||market,currency:m.currency||MARKET_META[market].currency,source:'project-materials',sourceMaterialId:m.id,sourceQuantity:delta,sourceUnitPrice:unitPrice};onAddExpense(expense);setRegisteredExpenses(current=>[...current,expense]);}
   function useCatalog(p){setName(p[0]);setUnit(p[1]);setPrice(String(p[3]));setSearch('');setCategory('Todas');}
   function changeMarket(value){setMarket(value);setSearch('');setCategory('Todas');}
   return <div className="modal-backdrop"><section className="project-form" aria-label="Materiales de obra">
