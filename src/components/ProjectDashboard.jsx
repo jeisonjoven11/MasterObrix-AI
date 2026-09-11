@@ -16,10 +16,11 @@ const expenseQuantity = (expense, material) => {
 
 export default function ProjectDashboard({ project, budgets, expenses, materials, onClose, onOpenMaterials, onOpenExpenses, onOpenProfitability, onOpenBudget, onOpenAssistant }) {
   const [showAll, setShowAll] = useState(false);
-  const projectBudgets = budgets.filter(b => b.projectId === project.id);
-  const projectExpenses = expenses.filter(e => e.projectId === project.id);
-  const projectMaterials = materials.filter(m => m.projectId === project.id);
   const market = project.market || 'CO';
+  const projectCurrency = currencyMap[market] || 'USD';
+  const projectBudgets = budgets.filter(b => b.projectId === project.id && (!b.currency || b.currency === projectCurrency));
+  const projectExpenses = expenses.filter(e => e.projectId === project.id && (!e.currency || e.currency === projectCurrency));
+  const projectMaterials = materials.filter(m => m.projectId === project.id);
   const budgeted = projectBudgets.reduce((s, b) => s + Math.max(0, Number(b.total || 0)), 0);
   const spent = projectExpenses.reduce((s, e) => s + Math.max(0, Number(e.amount || 0)), 0);
   const planned = Math.max(0, Number(project.budget || 0), budgeted);
