@@ -13,7 +13,7 @@ function roundMoney(value) { return Number(nonNegativeNumber(value).toFixed(2));
 function validPrice(value) { return value !== '' && value !== null && value !== undefined && Number.isFinite(Number(value)) && Number(value) >= 0; }
 
 export default function BudgetEditor({ projects, initialItem, initialProjectId, onSave, onClose }) {
-  const [projectId, setProjectId] = useState(initialProjectId || projects[0]?.id || '');
+  const [projectId, setProjectId] = useState(initialItem?.projectId || initialProjectId || projects[0]?.id || '');
   const [items, setItems] = useState(() => {
     if (!initialItem) return [{ ...emptyItem }];
     const quantity = positiveNumber(initialItem.quantity);
@@ -21,8 +21,8 @@ export default function BudgetEditor({ projects, initialItem, initialProjectId, 
     const unitPrice = nonNegativeNumber(initialItem.unitPrice) || (quantity && total ? total / quantity : '');
     return [{ ...emptyItem, ...initialItem, quantity: initialItem.quantity ?? '', unitPrice }];
   });
-  const [markup, setMarkup] = useState('10');
-  const [indirectPercent, setIndirectPercent] = useState('5');
+  const [markup, setMarkup] = useState(() => String(initialItem?.markup ?? 10));
+  const [indirectPercent, setIndirectPercent] = useState(() => String(initialItem?.indirectPercent ?? 5));
   const project = projects.find((item) => item.id === projectId);
   const currency = currencyByMarket[project?.market || 'CO'] || currencyByMarket.OTHER;
   const money = (value) => new Intl.NumberFormat(currency.locale, { style: 'currency', currency: currency.code, maximumFractionDigits: 2 }).format(nonNegativeNumber(value));
@@ -52,12 +52,13 @@ export default function BudgetEditor({ projects, initialItem, initialProjectId, 
     const normalizedItems = validItems.map((item) => ({ ...item, description: item.description.trim(), quantity: positiveNumber(item.quantity), unitPrice: roundMoney(item.unitPrice), total: roundMoney(itemTotal(item)) }));
     onSave({ id: initialItem?.id || makeId(), projectId, items: normalizedItems, markup: markupRate, indirectPercent: indirectRate, directSubtotal, indirectCosts, subtotal: costBase, profit, total, categoryTotals, currency: currency.code, createdAt: initialItem?.createdAt || new Date().toISOString() });
   }
+  const editing = Boolean(initialItem);
   return <div className="modal-backdrop"><form className="budget-form" onSubmit={submit}>
-    <div className="form-heading"><div><span className="eyebrow">NUEVO PRESUPUESTO</span><h2>Construir presupuesto</h2><small>Moneda: {currency.code}</small></div><button type="button" onClick={onClose}>✕</button></div>
+    <div className="form-heading"><div><span className="eyebrow">{editing ? 'EDITAR PRESUPUESTO' : 'NUEVO PRESUPUESTO'}</span><h2>{editing ? 'Actualizar presupuesto' : 'Construir presupuesto'}</h2><small>Moneda: {currency.code}</small></div><button type="button" onClick={onClose}>✕</button></div>
     <label>Proyecto<select required value={projectId} onChange={(e) => setProjectId(e.target.value)}><option value="">Selecciona una obra</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
     <div className="budget-items">{items.map((item, index) => <div className="budget-item" key={index}><input required value={item.description} onChange={(e) => updateItem(index, 'description', e.target.value)} placeholder="Ej. Cemento" /><select value={item.category} onChange={(e) => updateItem(index, 'category', e.target.value)}><option>Materiales</option><option>Mano de obra</option><option>Otros</option></select><input required type="number" min="0.01" step="any" value={item.quantity} onChange={(e) => updateItem(index, 'quantity', e.target.value)} placeholder="Cantidad" /><select value={item.unit} onChange={(e) => updateItem(index, 'unit', e.target.value)}><option>unidad</option><option>m</option><option>m²</option><option>m³</option><option>kg</option><option>l</option><option>hora</option><option>día</option></select><input required type="number" min="0" step="0.01" value={item.unitPrice} onChange={(e) => updateItem(index, 'unitPrice', e.target.value)} placeholder={`Precio (${currency.code})`} /><strong>{money(itemTotal(item))}</strong><button type="button" onClick={() => removeItem(index)} aria-label="Eliminar partida" disabled={items.length === 1}>×</button></div>)}</div>
     <button className="add-item" type="button" onClick={addItem}>+ Añadir partida</button>
     <div className="budget-summary"><label>Costos indirectos (%)<input type="number" min="0" max="100" step="0.5" value={indirectPercent} onChange={(e) => setIndirectPercent(e.target.value)} /></label><small>Incluye de forma estimada transporte, administración, herramientas, imprevistos u otros costos que no estén en las partidas.</small><label>Utilidad sobre costo (%)<input type="number" min="0" max="1000" step="0.5" value={markup} onChange={(e) => setMarkup(e.target.value)} /></label><small>Se calcula como recargo porcentual sobre el costo base. Ejemplo: 10% de utilidad sobre costo = costo base × 1,10.</small><div><span>Materiales</span><strong>{money(categoryTotals.Materiales)}</strong></div><div><span>Mano de obra</span><strong>{money(categoryTotals['Mano de obra'])}</strong></div><div><span>Otros</span><strong>{money(categoryTotals.Otros)}</strong></div><div><span>Costo directo</span><strong>{money(directSubtotal)}</strong></div><div><span>Costos indirectos</span><strong>{money(indirectCosts)}</strong></div><div><span>Costo base</span><strong>{money(costBase)}</strong></div><div><span>Utilidad</span><strong>{money(profit)}</strong></div><div className="total"><span>Total al cliente</span><strong>{money(total)}</strong></div></div>
-    <button className="primary form-submit" type="submit">Guardar presupuesto</button>
+    <button className="primary form-submit" type="submit">{editing ? 'Actualizar presupuesto' : 'Guardar presupuesto'}</button>
   </form></div>;
 }
