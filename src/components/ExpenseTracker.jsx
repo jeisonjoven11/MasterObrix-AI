@@ -8,7 +8,8 @@ export default function ExpenseTracker({ projects, expenses, initialProjectId = 
   const [projectId, setProjectId] = useState(initialProjectId || projects[0]?.id || '');
   const [form, setForm] = useState(emptyExpense);
   const project = projects.find((item) => item.id === projectId);
-  const currency = currencyByMarket[project?.market || 'CO'] || currencyByMarket.OTHER;
+  const market = project?.market || 'CO';
+  const currency = currencyByMarket[market] || currencyByMarket.OTHER;
   const money = (value) => new Intl.NumberFormat(currency.locale, { style: 'currency', currency: currency.code, maximumFractionDigits: 2 }).format(Number(value) || 0);
   const projectExpenses = useMemo(() => expenses.filter((expense) => expense.projectId === projectId), [expenses, projectId]);
   const totals = useMemo(() => projectExpenses.reduce((result, expense) => {
@@ -23,7 +24,16 @@ export default function ExpenseTracker({ projects, expenses, initialProjectId = 
     event.preventDefault();
     const amount = Number(form.amount);
     if (!projectId || !form.description.trim() || !Number.isFinite(amount) || amount <= 0) return;
-    onSave({ ...form, description: form.description.trim(), id: makeId(), projectId, amount, createdAt: new Date().toISOString() });
+    onSave({
+      ...form,
+      description: form.description.trim(),
+      id: makeId(),
+      projectId,
+      market,
+      currency: currency.code,
+      amount,
+      createdAt: new Date().toISOString()
+    });
     setForm(emptyExpense);
   }
 
