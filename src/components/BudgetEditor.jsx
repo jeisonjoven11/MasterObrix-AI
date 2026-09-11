@@ -7,6 +7,7 @@ function makeId(){return globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Mat
 function positiveNumber(value) { const number = Number(value); return Number.isFinite(number) && number > 0 ? number : 0; }
 function nonNegativeNumber(value) { const number = Number(value); return Number.isFinite(number) && number >= 0 ? number : 0; }
 function boundedPercent(value, max) { return Math.min(max, Math.max(0, nonNegativeNumber(value))); }
+function roundMoney(value) { return Number(nonNegativeNumber(value).toFixed(2)); }
 
 export default function BudgetEditor({ projects, initialItem, initialProjectId, onSave, onClose }) {
   const [projectId, setProjectId] = useState(initialProjectId || projects[0]?.id || '');
@@ -23,26 +24,26 @@ export default function BudgetEditor({ projects, initialItem, initialProjectId, 
   const currency = currencyByMarket[project?.market || 'CO'] || currencyByMarket.OTHER;
   const money = (value) => new Intl.NumberFormat(currency.locale, { style: 'currency', currency: currency.code, maximumFractionDigits: 2 }).format(nonNegativeNumber(value));
   const itemTotal = (item) => positiveNumber(item.quantity) * nonNegativeNumber(item.unitPrice);
-  const directSubtotal = useMemo(() => items.reduce((sum, item) => sum + itemTotal(item), 0), [items]);
+  const directSubtotal = useMemo(() => roundMoney(items.reduce((sum, item) => sum + itemTotal(item), 0)), [items]);
   const categoryTotals = useMemo(() => items.reduce((totals, item) => {
     const value = itemTotal(item);
-    totals[item.category] = (totals[item.category] || 0) + value;
+    totals[item.category] = roundMoney((totals[item.category] || 0) + value);
     return totals;
   }, { Materiales: 0, 'Mano de obra': 0, Otros: 0 }), [items]);
   const indirectRate = boundedPercent(indirectPercent, 100);
   const markupRate = boundedPercent(markup, 1000);
-  const indirectCosts = directSubtotal * (indirectRate / 100);
-  const costBase = directSubtotal + indirectCosts;
-  const profit = costBase * (markupRate / 100);
-  const total = costBase + profit;
+  const indirectCosts = roundMoney(directSubtotal * (indirectRate / 100));
+  const costBase = roundMoney(directSubtotal + indirectCosts);
+  const profit = roundMoney(costBase * (markupRate / 100));
+  const total = roundMoney(costBase + profit);
   const updateItem = (index, field, value) => setItems((current) => current.map((item, i) => i === index ? { ...item, [field]: value } : item));
   const addItem = () => setItems((current) => [...current, { ...emptyItem }]);
   const removeItem = (index) => setItems((current) => current.length === 1 ? current : current.filter((_, i) => i !== index));
   function submit(event) {
     event.preventDefault();
-    const validItems = items.filter((item) => item.description.trim() && positiveNumber(item.quantity) > 0 && nonNegativeNumber(item.unitPrice) >= 0);
+    const validItems = items.filter((item) => item.description.trim() && positiveNumber(item.quantity) > 0 && Number.isFinite(Number(item.unitPrice)) && nonNegativeNumber(item.unitPrice) >= 0);
     if (!projectId || !validItems.length) return;
-    const normalizedItems = validItems.map((item) => ({ ...item, quantity: positiveNumber(item.quantity), unitPrice: nonNegativeNumber(item.unitPrice), total: Number(itemTotal(item).toFixed(2)) }));
+    const normalizedItems = validItems.map((item) => ({ ...item, quantity: positiveNumber(item.quantity), unitPrice: roundMoney(item.unitPrice), total: roundMoney(itemTotal(item)) }));
     onSave({ id: makeId(), projectId, items: normalizedItems, markup: markupRate, indirectPercent: indirectRate, directSubtotal, indirectCosts, subtotal: costBase, profit, total, categoryTotals, currency: currency.code, createdAt: new Date().toISOString() });
   }
   return <div className="modal-backdrop"><form className="budget-form" onSubmit={submit}>
