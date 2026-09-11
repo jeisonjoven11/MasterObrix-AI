@@ -7,13 +7,18 @@ function formatMoney(value, market) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 }).format(Number(value) || 0);
 }
 
+function belongsToProjectCurrency(item, currency) {
+  return !item?.currency || item.currency === currency;
+}
+
 export default function ProfitabilityPanel({ projects, budgets, expenses, onClose }) {
   const rows = useMemo(() => projects.map((project) => {
-    const budget = budgets.filter((item) => item.projectId === project.id).reduce((sum, item) => {
+    const currency = CURRENCY_BY_MARKET[project.market] || 'USD';
+    const budget = budgets.filter((item) => item.projectId === project.id && belongsToProjectCurrency(item, currency)).reduce((sum, item) => {
       const value = Number(item.total);
       return Number.isFinite(value) && value > 0 ? sum + value : sum;
     }, 0);
-    const spent = expenses.filter((item) => item.projectId === project.id).reduce((sum, item) => {
+    const spent = expenses.filter((item) => item.projectId === project.id && belongsToProjectCurrency(item, currency)).reduce((sum, item) => {
       const value = Number(item.amount);
       return Number.isFinite(value) && value > 0 ? sum + value : sum;
     }, 0);
