@@ -13,6 +13,7 @@ function roundMoney(value) { return Number(nonNegativeNumber(value).toFixed(2));
 function validPrice(value) { return value !== '' && value !== null && value !== undefined && Number.isFinite(Number(value)) && Number(value) >= 0; }
 
 export default function BudgetEditor({ projects, initialItem, initialProjectId, onSave, onClose }) {
+  const editing = Boolean(initialItem?.id);
   const [projectId, setProjectId] = useState(initialItem?.projectId || initialProjectId || projects[0]?.id || '');
   const [items, setItems] = useState(() => {
     if (!initialItem) return [{ ...emptyItem }];
@@ -50,9 +51,8 @@ export default function BudgetEditor({ projects, initialItem, initialProjectId, 
     });
     if (!projectId || !projects.some((item) => item.id === projectId) || !validItems.length) return;
     const normalizedItems = validItems.map((item) => ({ ...item, description: item.description.trim(), quantity: positiveNumber(item.quantity), unitPrice: roundMoney(item.unitPrice), total: roundMoney(itemTotal(item)) }));
-    onSave({ id: initialItem?.id || makeId(), projectId, items: normalizedItems, markup: markupRate, indirectPercent: indirectRate, directSubtotal, indirectCosts, subtotal: costBase, profit, total, categoryTotals, currency: currency.code, createdAt: initialItem?.createdAt || new Date().toISOString() });
+    onSave({ id: editing ? initialItem.id : makeId(), projectId, items: normalizedItems, markup: markupRate, indirectPercent: indirectRate, directSubtotal, indirectCosts, subtotal: costBase, profit, total, categoryTotals, currency: currency.code, createdAt: editing ? initialItem.createdAt : new Date().toISOString() });
   }
-  const editing = Boolean(initialItem);
   return <div className="modal-backdrop"><form className="budget-form" onSubmit={submit}>
     <div className="form-heading"><div><span className="eyebrow">{editing ? 'EDITAR PRESUPUESTO' : 'NUEVO PRESUPUESTO'}</span><h2>{editing ? 'Actualizar presupuesto' : 'Construir presupuesto'}</h2><small>Moneda: {currency.code}</small></div><button type="button" onClick={onClose}>✕</button></div>
     <label>Proyecto<select required value={projectId} onChange={(e) => setProjectId(e.target.value)}><option value="">Selecciona una obra</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
