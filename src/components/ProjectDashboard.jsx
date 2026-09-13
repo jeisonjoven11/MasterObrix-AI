@@ -2,15 +2,19 @@ import { useMemo, useState } from 'react';
 
 const currencyMap = { CO: 'COP', ES: 'EUR', EU: 'EUR', GB: 'GBP', MX: 'MXN', OTHER: 'USD' };
 const localeMap = { CO: 'es-CO', ES: 'es-ES', EU: 'es-ES', GB: 'en-GB', MX: 'es-MX', OTHER: 'en-US' };
-const money = (value, market = 'CO') => new Intl.NumberFormat(localeMap[market] || 'en-US', { style: 'currency', currency: currencyMap[market] || 'USD', maximumFractionDigits: market === 'CO' ? 0 : 2 }).format(Number(value) || 0);
-const number = (value, market = 'CO') => Math.round(Number(value) || 0).toLocaleString(localeMap[market] || 'en-US');
+const finitePositive = value => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+};
+const money = (value, market = 'CO') => new Intl.NumberFormat(localeMap[market] || 'en-US', { style: 'currency', currency: currencyMap[market] || 'USD', maximumFractionDigits: market === 'CO' ? 0 : 2 }).format(finitePositive(value));
+const number = (value, market = 'CO') => Math.round(finitePositive(value)).toLocaleString(localeMap[market] || 'en-US');
 const expenseQuantity = (expense, material) => {
   const explicit = Number(expense?.sourceQuantity);
   if (Number.isFinite(explicit) && explicit > 0) return explicit;
-  const amount = Number(expense?.amount) || 0;
-  const historicalPrice = Number(expense?.sourceUnitPrice);
+  const amount = finitePositive(expense?.amount);
+  const historicalPrice = finitePositive(expense?.sourceUnitPrice);
   if (historicalPrice > 0) return amount / historicalPrice;
-  const currentPrice = Number(material?.price) || 0;
+  const currentPrice = finitePositive(material?.price);
   return currentPrice > 0 ? amount / currentPrice : 0;
 };
 
@@ -21,13 +25,14 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
   const projectBudgets = budgets.filter(b => b.projectId === project.id && (!b.currency || b.currency === projectCurrency));
   const projectExpenses = expenses.filter(e => e.projectId === project.id && (!e.currency || e.currency === projectCurrency));
   const projectMaterials = materials.filter(m => m.projectId === project.id);
-  const budgeted = projectBudgets.reduce((s, b) => s + Math.max(0, Number(b.total || 0)), 0);
-  const spent = projectExpenses.reduce((s, e) => s + Math.max(0, Number(e.amount || 0)), 0);
-  const planned = Math.max(0, Number(project.budget || 0), budgeted);
+  const budgeted = projectBudgets.reduce((s, b) => s + finitePositive(b.total), 0);
+  const spent = projectExpenses.reduce((s, e) => s + finitePositive(e.amount), 0);
+  const projectBudget = finitePositive(project.budget);
+  const planned = Math.max(0, projectBudget, budgeted);
   const remaining = planned - spent;
-  const materialMissing = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)), 0);
-  const materialSpent = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.purchased || 0)) * Math.max(0, Number(m.price || 0)), 0);
-  const pendingMaterialCost = projectMaterials.reduce((s, m) => s + Math.max(0, Number(m.needed || 0) - Number(m.purchased || 0)) * Math.max(0, Number(m.price || 0)), 0);
+  const materialMissing = projectMaterials.reduce((s, m) => s + Math.max(0, finitePositive(m.needed) - finitePositive(m.purchased)), 0);
+  const materialSpent = projectMaterials.reduce((s, m) => s + finitePositive(m.purchased) * finitePositive(m.price), 0);
+  const pendingMaterialCost = projectMaterials.reduce((s, m) => s + Math.max(0, finitePositive(m.needed) - finitePositive(m.purchased)) * finitePositive(m.price), 0);
   const registeredMaterialQuantities = useMemo(() => projectExpenses.reduce((map, expense) => {
     if (expense.source !== 'project-materials' || !expense.sourceMaterialId) return map;
     const material = projectMaterials.find(m => m.id === expense.sourceMaterialId);
@@ -35,19 +40,19 @@ export default function ProjectDashboard({ project, budgets, expenses, materials
     return map;
   }, {}), [projectExpenses, projectMaterials]);
   const unregisteredMaterialCost = projectMaterials.reduce((s, m) => {
-    const purchased = Math.max(0, Number(m.purchased || 0));
-    const registered = Math.max(0, Number(registeredMaterialQuantities[m.id]) || 0);
-    return s + Math.max(0, purchased - registered) * Math.max(0, Number(m.price || 0));
+    const purchased = finitePositive(m.purchased);
+    const registered = finitePositive(registeredMaterialQuantities[m.id]);
+    return s + Math.max(0, purchased - registered) * finitePositive(m.price);
   }, 0);
   const materialReconciliationIssues = projectMaterials.filter(m => {
-    const purchased = Math.max(0, Number(m.purchased || 0));
-    const registered = Math.max(0, Number(registeredMaterialQuantities[m.id]) || 0);
+    const purchased = finitePositive(m.purchased);
+    const registered = finitePositive(registeredMaterialQuantities[m.id]);
     return registered > purchased + 0.0001;
   });
   const projectedCost = spent + unregisteredMaterialCost + pendingMaterialCost;
   const projectedBalance = planned - projectedCost;
   const consumed = planned > 0 ? (spent / planned) * 100 : 0;
-  const physicalProgress = Math.min(100, Math.max(0, Number(project.progress || 0)));
+  const physicalProgress = Math.min(100, Math.max(0, finitePositive(project.progress)));
   const progress = physicalProgress > 0 ? Math.round(physicalProgress) : Math.min(100, Math.max(0, Math.round(consumed)));
   const status = planned <= 0 ? '⚪ Falta presupuesto' : projectedCost > planned ? '🔴 Riesgo de sobrecosto' : consumed >= 80 ? '🟠 Vigilar costos' : '🟢 Bajo control';
 
