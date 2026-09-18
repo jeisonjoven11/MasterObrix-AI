@@ -33,20 +33,23 @@ function writeWeb(key, value) {
 async function readNative(key) {
   try {
     const value = await SecureStorage.get(key);
-    return Array.isArray(value) ? value : [];
+    if (Array.isArray(value)) return value;
+    if (value !== null) return [];
   } catch {
-    // One-time migration from the previous plaintext localStorage format.
-    const legacy = readWeb(key);
-    if (legacy.length) {
-      try {
-        await SecureStorage.set(key, legacy);
-        localStorage.removeItem(key);
-      } catch {
-        // Do not expose the legacy data to the app if secure migration fails.
-        return [];
-      }
-    }
+    // A secure-storage OS error must never fall back to plaintext data.
+    return [];
+  }
+
+  // One-time migration from the previous plaintext localStorage format.
+  const legacy = readWeb(key);
+  if (!legacy.length) return [];
+  try {
+    await SecureStorage.set(key, legacy);
+    localStorage.removeItem(key);
     return legacy;
+  } catch {
+    // Do not expose or keep using legacy plaintext data if migration fails.
+    return [];
   }
 }
 
