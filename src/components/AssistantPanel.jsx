@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { askMasterObrixAI } from '../services/ai';
 
 const suggestions = [
   '¿Cómo va mi obra?',
@@ -122,13 +123,31 @@ function number(value) {
 export default function AssistantPanel({ onClose, project, budgets = [], expenses = [], materials = [] }) {
   const context = useMemo(() => buildContext(project, budgets, expenses, materials), [project, budgets, expenses, materials]);
   const [question, setQuestion] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiOnline, setAiOnline] = useState(false);
   const [messages, setMessages] = useState(() => context ? [{ role: 'assistant', text: `🏗️ Estoy revisando **${context.name}**.\n\n${context.summary}\n\n📐 ${context.technical.replace(/\n/g, ' · ')}\n\nPuedes preguntarme por materiales, gastos, presupuesto, riesgos o pedirme una revisión inteligente.` }] : []);
 
-  function ask(text = question) {
+  async function ask(text = question) {
     const clean = text.trim();
-    if (!clean) return;
-    setMessages((items) => [...items, { role: 'user', text: clean }, { role: 'assistant', ...answerFor(clean, context) }]);
+    if (!clean || aiBusy) return;
+    const fallback = answerFor(clean, context);
+    const contextPrompt = context ? `Contexto de obra actual (datos registrados por el usuario):\\n${context.name}\\n${context.summary}\\nPerfil técnico:\\n${context.technical}\\nMateriales: ${context.materialSummary}\\nFinanzas: ${context.financialSummary}\\nDiagnóstico: ${context.diagnostic}` : 'No hay una obra seleccionada.';
+    const system = 'Eres MasterObrix AI, un asistente especializado en construcción. Responde en español claro y práctico. Ayuda con presupuestos, materiales, costos, planificación y control de obra. No inventes cantidades, precios, normativa ni datos del proyecto. Cuando falte información, pregunta. Las recomendaciones técnicas son orientativas y deben validarse con un profesional responsable. Usa el contexto proporcionado y protege la privacidad: no solicites secretos ni credenciales.';
+    setMessages((items) => [...items, { role: 'user', text: clean }, { role: 'assistant', text: '🤖 Analizando tu consulta...' }]);
     setQuestion('');
+    setAiBusy(true);
+    const content = await askMasterObrixAI([
+      { role: 'system', content: system },
+      { role: 'user', content: `${contextPrompt}\\n\\nConsulta: ${clean}` }
+    ]);
+    setAiBusy(false);
+    if (content) {
+      setAiOnline(true);
+      setMessages((items) => items.slice(0, -1).concat([{ role: 'assistant', text: content }]));
+    } else {
+      setAiOnline(false);
+      setMessages((items) => items.slice(0, -1).concat([{ role: 'assistant', ...fallback }]));
+    }
   }
 
   function action(label) {
@@ -138,10 +157,10 @@ export default function AssistantPanel({ onClose, project, budgets = [], expense
 
   return <div className="modal-backdrop"><section className="assistant-panel">
     <div className="form-heading"><div><span className="eyebrow">MASTEROBRIX AI</span><h2>Asistente de construcción</h2><p>{context ? `Analizando: ${context.name}` : 'Calcula, orienta y te propone el siguiente paso.'}</p></div><button type="button" onClick={onClose}>✕</button></div>
-    <div className="assistant-disclaimer">🧠 Modo actual: asistente local. No hay un modelo externo conectado todavía. Cuando conectemos el servicio seguro de IA, podrá razonar sobre este mismo contexto de obra. Verifica cantidades, precios y normativa con el profesional responsable.</div>
+    <div className="assistant-disclaimer">🤖 {aiOnline ? 'IA conectada de forma segura.' : 'IA externa disponible cuando el servicio seguro esté configurado; mientras tanto uso el asistente local.'} Verifica cantidades, precios y normativa con el profesional responsable.</div>
     {context && <div className="assistant-context"><strong>📌 Contexto de obra</strong><span>{context.name} · {context.technical.replace(/\n/g, ' · ')}</span></div>}
     <div className="assistant-suggestions">{suggestions.map((item) => <button type="button" key={item} onClick={() => ask(item)}>{item}</button>)}</div>
     <div className="assistant-messages">{messages.length === 0 ? <div className="assistant-empty">🏗️<strong>¿En qué obra estás trabajando?</strong><span>Puedo ayudarte a calcular materiales, revisar presupuestos y controlar gastos.</span></div> : messages.map((message, index) => <div key={`${message.role}-${index}`}><div className={`assistant-message ${message.role}`} style={{ whiteSpace: 'pre-line' }}>{message.text}</div>{message.role === 'assistant' && message.actions?.length > 0 && <div className="assistant-suggestions">{message.actions.map((item) => <button type="button" key={item} onClick={() => action(item)}>{item}</button>)}</div>}</div>)}</div>
-    <form className="assistant-input" onSubmit={(e) => { e.preventDefault(); ask(); }}><input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ej: ¿Cómo va mi obra?"/><button className="primary" type="submit">Preguntar</button></form>
+    <form className="assistant-input" onSubmit={(e) => { e.preventDefault(); ask(); }}><input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ej: ¿Cómo va mi obra?"/><button className="primary" type="submit" disabled={aiBusy}>{aiBusy ? 'Analizando…' : 'Preguntar'}</button></form>
   </section></div>;
 }
