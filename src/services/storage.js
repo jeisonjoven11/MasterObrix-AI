@@ -1,9 +1,17 @@
-const PROJECTS_KEY = 'masterobrix-projects';
-const CLIENTS_KEY = 'masterobrix-clients';
-const BUDGETS_KEY = 'masterobrix-budgets';
-const EXPENSES_KEY = 'masterobrix-expenses';
+import { Capacitor } from '@capacitor/core';
+import { SecureStorage } from '@aparajita/capacitor-secure-storage';
 
-function read(key) {
+const KEYS = {
+  projects: 'masterobrix-projects',
+  clients: 'masterobrix-clients',
+  budgets: 'masterobrix-budgets',
+  expenses: 'masterobrix-expenses',
+  materials: 'masterobrix-materials'
+};
+
+const native = Capacitor.isNativePlatform();
+
+function readWeb(key) {
   try {
     const raw = localStorage.getItem(key);
     const value = raw ? JSON.parse(raw) : [];
@@ -13,7 +21,7 @@ function read(key) {
   }
 }
 
-function write(key, value) {
+function writeWeb(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(Array.isArray(value) ? value : []));
     return true;
@@ -22,13 +30,50 @@ function write(key, value) {
   }
 }
 
+async function readNative(key) {
+  try {
+    const value = await SecureStorage.get(key);
+    return Array.isArray(value) ? value : [];
+  } catch {
+    // One-time migration from the previous plaintext localStorage format.
+    const legacy = readWeb(key);
+    if (legacy.length) {
+      try {
+        await SecureStorage.set(key, legacy);
+        localStorage.removeItem(key);
+      } catch {
+        // Do not expose the legacy data to the app if secure migration fails.
+        return [];
+      }
+    }
+    return legacy;
+  }
+}
+
+async function read(key) {
+  return native ? readNative(key) : readWeb(key);
+}
+
+async function write(key, value) {
+  const safeValue = Array.isArray(value) ? value : [];
+  if (!native) return writeWeb(key, safeValue);
+  try {
+    await SecureStorage.set(key, safeValue);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const storage = {
-  getProjects: () => read(PROJECTS_KEY),
-  saveProjects: (value) => write(PROJECTS_KEY, value),
-  getClients: () => read(CLIENTS_KEY),
-  saveClients: (value) => write(CLIENTS_KEY, value),
-  getBudgets: () => read(BUDGETS_KEY),
-  saveBudgets: (value) => write(BUDGETS_KEY, value),
-  getExpenses: () => read(EXPENSES_KEY),
-  saveExpenses: (value) => write(EXPENSES_KEY, value),
+  getProjects: () => read(KEYS.projects),
+  saveProjects: (value) => write(KEYS.projects, value),
+  getClients: () => read(KEYS.clients),
+  saveClients: (value) => write(KEYS.clients, value),
+  getBudgets: () => read(KEYS.budgets),
+  saveBudgets: (value) => write(KEYS.budgets, value),
+  getExpenses: () => read(KEYS.expenses),
+  saveExpenses: (value) => write(KEYS.expenses, value),
+  getMaterials: () => read(KEYS.materials),
+  saveMaterials: (value) => write(KEYS.materials, value)
 };
