@@ -10,7 +10,8 @@
     "test": "node --test",
     "preview": "vite preview",
     "android:sync": "npm run build:mobile && cap sync android",
-    "android:open": "cap open android"
+    "android:open": "cap open android",
+    "security:audit": "node scripts/security-audit.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.0.0",
